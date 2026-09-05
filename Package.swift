@@ -7,6 +7,7 @@ let package = Package(
         .macOS(.v13)
     ],
     products: [
+        .executable(name: "msa-app", targets: ["MSAApp"]),
         .executable(name: "msa-daemon", targets: ["MSADaemon"]),
         .executable(name: "msa-cli", targets: ["MSACLI"]),
         .library(name: "MSACore", targets: ["MSACore"])
@@ -16,6 +17,11 @@ let package = Package(
             name: "MSACore",
             dependencies: [],
             path: "Sources/MSACore"
+        ),
+        .executableTarget(
+            name: "MSAApp",
+            dependencies: ["MSACore"],
+            path: "Sources/MSAApp"
         ),
         .executableTarget(
             name: "MSADaemon",
