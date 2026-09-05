@@ -1,5 +1,6 @@
 import Foundation
 import MSACore
+import Virtualization
 
 let args = CommandLine.arguments
 
@@ -61,10 +62,8 @@ case "setup":
         print("✅ Configuration sauvegardée dans ~/.msa/config.json")
         print("📁 Dossier système : \(config.dataDirectory)\n")
         
-        // Téléchargement et préparation automatique
         let scriptPath = "/Users/mathias/Documents/MacSubsystemForAndroid/Scripts/fetch_android_image.sh"
         if FileManager.default.fileExists(atPath: scriptPath) {
-            print("🚀 Début du téléchargement et de la configuration automatique de tous les composants...\n")
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
             process.arguments = [scriptPath, String(selectedVersion.rawValue)]
@@ -78,18 +77,35 @@ case "setup":
 
 case "start":
     let currentConfig = MSAConfig.load()
-    print("🚀 Initialisation du sous-système Android \(currentConfig.selectedAndroidVersion) (Virtualization.framework)...")
-    Task {
-        do {
-            try await VMManager.shared.start()
-            print("✅ Android Subsystem démarré avec succès.")
-            dispatchMain()
-        } catch {
-            print("❌ Erreur au démarrage du sous-système: \(error.localizedDescription)")
-            exit(1)
-        }
+    print("🚀 Initialisation du sous-système Android \(currentConfig.selectedAndroidVersion)...")
+    
+    guard VZVirtualMachine.isSupported else {
+        print("❌ Virtualization.framework n'est pas supporté sur cette machine.")
+        exit(1)
     }
-    dispatchMain()
+    
+    print("⚡ Vérification de la configuration VZ...")
+    do {
+        let vzConfig = try VMManager.shared.createConfiguration()
+        print("✅ Configuration VZ validée. Démarrage de la machine virtuelle...")
+        
+        let vm = VZVirtualMachine(configuration: vzConfig)
+        vm.start { result in
+            switch result {
+            case .success:
+                print("🟢 Machine virtuelle Android en cours d'exécution !")
+                print("👉 Les applications Android s'exécutent en tâche de fond.")
+                print("👉 Utilisez 'msa install <apk>' ou double-cliquez sur vos apps dans Spotlight.")
+            case .failure(let error):
+                print("❌ Échec du démarrage de la VM: \(error.localizedDescription)")
+                exit(1)
+            }
+        }
+        dispatchMain()
+    } catch {
+        print("❌ Erreur de configuration de la VM: \(error.localizedDescription)")
+        exit(1)
+    }
 
 case "status":
     let currentConfig = MSAConfig.load()

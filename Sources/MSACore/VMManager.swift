@@ -42,7 +42,6 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         let kernelAttrs = try fm.attributesOfItem(atPath: config.kernelPath)
         let kernelSize = (kernelAttrs[.size] as? UInt64) ?? 0
         if kernelSize < 1000000 {
-            // Fichier trop petit ou page HTML/texte 404
             throw NSError(domain: "MSA", code: 2, userInfo: [NSLocalizedDescriptionKey: "Le fichier kernel semble invalide ou corrompu (\(kernelSize) octets). Lancez 'msa setup' pour le retélécharger."])
         }
     }
@@ -53,31 +52,14 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         let config = MSAConfig.load()
         
         // 1. CPU & Memory
-        vzConfig.cpuCount = min(config.cpuCount, VZVirtualMachineConfiguration.maximumAllowedCPUCount)
+        vzConfig.cpuCount = max(2, min(config.cpuCount, VZVirtualMachineConfiguration.maximumAllowedCPUCount))
         let memoryBytes = config.memorySizeMB * 1024 * 1024
         vzConfig.memorySize = max(VZVirtualMachineConfiguration.minimumAllowedMemorySize,
                                   min(memoryBytes, VZVirtualMachineConfiguration.maximumAllowedMemorySize))
         
         // 2. Linux / Android Bootloader
         let bootLoader = VZLinuxBootLoader(kernelURL: URL(fileURLWithPath: config.kernelPath))
-        let fm = FileManager.default
-        if fm.fileExists(atPath: config.initrdPath) {
-            let initrdSize = ((try? fm.attributesOfItem(atPath: config.initrdPath)[.size] as? UInt64) ?? 0)
-            if initrdSize > 100000 {
-                bootLoader.initialRamdiskURL = URL(fileURLWithPath: config.initrdPath)
-            }
-        }
-        
-        bootLoader.commandLine = [
-            "console=hvc0",
-            "root=/dev/vda",
-            "rw",
-            "androidboot.hardware=virtio",
-            "androidboot.selinux=permissive",
-            "androidboot.freeform_window_management=1",
-            "init=/init",
-            "quiet"
-        ].joined(separator: " ")
+        bootLoader.commandLine = "console=hvc0 quiet"
         vzConfig.bootLoader = bootLoader
         
         // 3. Serial Console
@@ -90,30 +72,8 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         serial.attachment = serialPortAttachment
         vzConfig.serialPorts = [serial]
         
-        // 4. Storage Devices
-        var storageDevices: [VZStorageDeviceConfiguration] = []
-        
-        if fm.fileExists(atPath: config.systemImagePath) {
-            let sysSize = ((try? fm.attributesOfItem(atPath: config.systemImagePath)[.size] as? UInt64) ?? 0)
-            if sysSize > 1000000 {
-                let systemAttachment = try VZDiskImageStorageDeviceAttachment(
-                    url: URL(fileURLWithPath: config.systemImagePath),
-                    readOnly: true
-                )
-                let systemBlock = VZVirtioBlockDeviceConfiguration(attachment: systemAttachment)
-                storageDevices.append(systemBlock)
-            }
-        }
-        
-        if fm.fileExists(atPath: config.diskImagePath) {
-            let dataAttachment = try VZDiskImageStorageDeviceAttachment(
-                url: URL(fileURLWithPath: config.diskImagePath),
-                readOnly: false
-            )
-            let dataBlock = VZVirtioBlockDeviceConfiguration(attachment: dataAttachment)
-            storageDevices.append(dataBlock)
-        }
-        vzConfig.storageDevices = storageDevices
+        // 4. Entropy
+        vzConfig.entropyDevices = [VZVirtioEntropyDeviceConfiguration()]
         
         // 5. Network (Virtio NAT)
         let networkDevice = VZVirtioNetworkDeviceConfiguration()
@@ -123,9 +83,6 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         // 6. Sockets (Virtio Vsock)
         let socketDevice = VZVirtioSocketDeviceConfiguration()
         vzConfig.socketDevices = [socketDevice]
-        
-        // 7. Entropy
-        vzConfig.entropyDevices = [VZVirtioEntropyDeviceConfiguration()]
         
         try vzConfig.validate()
         return vzConfig

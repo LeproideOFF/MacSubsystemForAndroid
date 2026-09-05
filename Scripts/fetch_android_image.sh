@@ -10,20 +10,22 @@ echo "🤖 Téléchargement & Déploiement : Android $VERSION ARM64"
 echo "═════════════════════════════════════════════════════════"
 echo "📁 Destination : $MSA_DIR"
 
-# 1. Kernel Linux ARM64 virtio officiel valide (HTTP 200 garanti)
+# 1. Kernel Linux ARM64 (Linux kernel ARM64 boot executable Image)
 echo ""
-echo "1️⃣  [1/4] Téléchargement du Kernel Linux virtio ARM64 (Ubuntu Cloud LTS)..."
+echo "1️⃣  [1/4] Téléchargement & Décompression du Kernel Linux ARM64 (Ubuntu Cloud LTS)..."
 KERNEL_URL="https://cloud-images.ubuntu.com/jammy/current/unpacked/jammy-server-cloudimg-arm64-vmlinuz-generic"
 
-if [ -f "$MSA_DIR/vmlinux-arm64" ] && [ $(stat -f%z "$MSA_DIR/vmlinux-arm64" 2>/dev/null || echo 0) -lt 10000000 ]; then
+if [ -f "$MSA_DIR/vmlinux-arm64" ] && [ $(stat -f%z "$MSA_DIR/vmlinux-arm64" 2>/dev/null || echo 0) -lt 30000000 ]; then
     rm -f "$MSA_DIR/vmlinux-arm64"
 fi
 
 if [ ! -f "$MSA_DIR/vmlinux-arm64" ]; then
-    curl -L --fail --progress-bar -o "$MSA_DIR/vmlinux-arm64" "$KERNEL_URL"
-    echo "    ✅ Kernel Linux virtio ARM64 téléchargé avec succès."
+    curl -L --fail --progress-bar -o "$MSA_DIR/vmlinuz.gz" "$KERNEL_URL"
+    gunzip -f "$MSA_DIR/vmlinuz.gz"
+    mv -f "$MSA_DIR/vmlinuz" "$MSA_DIR/vmlinux-arm64"
+    echo "    ✅ Kernel Linux ARM64 décompressé et certifié (Image uncompressed)."
 else
-    echo "    ✅ Kernel virtio ARM64 certifié et en cache."
+    echo "    ✅ Kernel ARM64 décompressé déjà en cache."
 fi
 
 # 2. Image Système AOSP ARM64
