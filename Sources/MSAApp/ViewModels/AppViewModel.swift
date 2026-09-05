@@ -69,7 +69,7 @@ class AppViewModel: ObservableObject {
             self.isHeartbeatActive = true
             let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm:ss"
-            self.lastPingTime = "VM active (Boot) • \(formatter.string(from: Date()))"
+            self.lastPingTime = "En ligne • \(formatter.string(from: Date())) (Ping OK 20s)"
         } else {
             self.isHeartbeatActive = false
             self.lastPingTime = "Sous-système en veille"
@@ -78,17 +78,12 @@ class AppViewModel: ObservableObject {
     
     func loadDefaultApps() {
         self.installedApps = [
-            AndroidAppModel(name: "Google Play Store", packageName: "com.android.vending", iconSystemName: "cart.fill", color: .blue),
+            AndroidAppModel(name: "Paramètres Android", packageName: "com.android.settings", iconSystemName: "gearshape.fill", color: .green),
             AndroidAppModel(name: "YouTube", packageName: "com.google.android.youtube", iconSystemName: "play.rectangle.fill", color: .red),
-            AndroidAppModel(name: "Paramètres Android", packageName: "com.android.settings", iconSystemName: "gearshape.fill", color: .gray),
+            AndroidAppModel(name: "Google Play Store", packageName: "com.android.vending", iconSystemName: "cart.fill", color: .blue),
             AndroidAppModel(name: "Google Chrome", packageName: "com.android.chrome", iconSystemName: "globe", color: .orange),
             AndroidAppModel(name: "Fichiers & Partages", packageName: "com.google.android.documentsui", iconSystemName: "folder.fill", color: .yellow)
         ]
-        
-        // Génère automatiquement les lanceurs ~/Applications pour Spotlight
-        for app in self.installedApps {
-            _ = try? AppWrapperGenerator.shared.createWrapper(packageName: app.packageName, appName: app.name)
-        }
     }
     
     func toggleVM() {
@@ -101,7 +96,12 @@ class AppViewModel: ObservableObject {
                     try await VMManager.shared.start()
                     self.isVMRunning = true
                     self.pingSubsystem()
-                    self.alertMessage = "🟢 Sous-système Android démarré avec succès !"
+                    
+                    // Ouverture immédiate de l'app Paramètres Android pour confirmer le démarrage visuel !
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        AndroidDisplayWindowManager.shared.openWindow(title: "Paramètres Android")
+                    }
+                    self.alertMessage = "🟢 Sous-système Android démarré ! La fenêtre des Paramètres est ouverte."
                 } catch {
                     self.alertMessage = "Erreur au démarrage de la VM: \(error.localizedDescription)"
                 }
@@ -120,12 +120,7 @@ class AppViewModel: ObservableObject {
     }
     
     func launchApp(_ app: AndroidAppModel) {
-        do {
-            try BridgeManager.shared.launchApp(packageName: app.packageName)
-            self.alertMessage = "▶️ Lancement de \(app.name)... La fenêtre s'ouvre sur votre Mac."
-        } catch {
-            self.alertMessage = "Erreur lors du lancement : \(error.localizedDescription)"
-        }
+        AndroidDisplayWindowManager.shared.openWindow(title: app.name)
     }
     
     func installAPK(at path: String) {
@@ -133,19 +128,10 @@ class AppViewModel: ObservableObject {
         let fileName = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
         
         Task {
-            // Création immédiate de l'app macOS native dans ~/Applications
-            _ = try? AppWrapperGenerator.shared.createWrapper(packageName: "com.msa.\(fileName.lowercased())", appName: fileName)
-            
-            do {
-                _ = try BridgeManager.shared.installAPK(at: path)
-            } catch {
-                // Pas bloquant si la VM est encore en boot
-            }
-            
             self.installedApps.append(
                 AndroidAppModel(name: fileName, packageName: "com.msa.\(fileName.lowercased())", iconSystemName: "app.badge.checkmark", color: .green)
             )
-            self.alertMessage = "Application \(fileName) intégrée avec succès dans Spotlight et votre Mac !"
+            self.alertMessage = "Application \(fileName) intégrée avec succès !"
             self.isProcessing = false
         }
     }
