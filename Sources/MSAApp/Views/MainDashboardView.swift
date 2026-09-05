@@ -1,16 +1,28 @@
 import SwiftUI
 import MSACore
 
-class DashboardState: ObservableObject {
-    @Published var isVMRunning: Bool = false
-    @Published var selectedVersion: Int = 14
-    @Published var installedApps: [String] = ["Google Play Store", "TikTok", "WhatsApp", "Instagram"]
-    @Published var isDraggingOver: Bool = false
+struct MainDashboardView: View {
+    @StateObject private var vm = AppViewModel()
+    
+    var body: some View {
+        Group {
+            if !vm.isConfigured {
+                SetupWizardView(vm: vm)
+            } else {
+                DashboardContent(vm: vm)
+            }
+        }
+        .alert(isPresented: Binding(
+            get: { vm.alertMessage != nil },
+            set: { if !$0 { vm.alertMessage = nil } }
+        )) {
+            Alert(title: Text("Mac Subsystem for Android"), message: Text(vm.alertMessage ?? ""), dismissButton: .default(Text("OK")))
+        }
+    }
 }
 
-struct MainDashboardView: View {
-    @StateObject private var state = DashboardState()
-    let versions = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+struct DashboardContent: View {
+    @ObservedObject var vm: AppViewModel
     
     var body: some View {
         NavigationSplitView {
@@ -31,7 +43,7 @@ struct MainDashboardView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Android Subsystem")
                             .font(.system(size: 14, weight: .bold))
-                        Text("Apple Silicon ARM64")
+                        Text("Android \(vm.selectedVersion) ARM64")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
@@ -44,10 +56,10 @@ struct MainDashboardView: View {
                 // Status Pill
                 HStack(spacing: 8) {
                     Circle()
-                        .fill(state.isVMRunning ? Color.green : Color.orange)
+                        .fill(vm.isVMRunning ? Color.green : Color.orange)
                         .frame(width: 9, height: 9)
-                        .shadow(color: state.isVMRunning ? .green : .orange, radius: 4)
-                    Text(state.isVMRunning ? "Sous-système Actif" : "En veille / Arrêté")
+                        .shadow(color: vm.isVMRunning ? .green : .orange, radius: 4)
+                    Text(vm.isVMRunning ? "Sous-système Actif" : "En veille / Arrêté")
                         .font(.system(size: 12, weight: .medium))
                     Spacer()
                 }
@@ -57,32 +69,49 @@ struct MainDashboardView: View {
                 .cornerRadius(10)
                 .padding(.horizontal, 16)
                 
-                // Menu List
+                // Navigation Buttons
                 VStack(spacing: 4) {
-                    SidebarButton(icon: "square.grid.2x2.fill", title: "Mes Applications", isSelected: true)
-                    SidebarButton(icon: "arrow.down.circle.fill", title: "Installation APK", isSelected: false)
-                    SidebarButton(icon: "gearshape.fill", title: "Performances & RAM", isSelected: false)
+                    SidebarNavButton(icon: "square.grid.2x2.fill", title: "Mes Applications", isSelected: vm.activeTab == "apps") {
+                        vm.activeTab = "apps"
+                    }
+                    SidebarNavButton(icon: "arrow.down.doc.fill", title: "Installer un APK", isSelected: vm.activeTab == "install") {
+                        vm.activeTab = "install"
+                    }
+                    SidebarNavButton(icon: "gearshape.2.fill", title: "Reconfigurer (Specs)", isSelected: vm.activeTab == "specs") {
+                        withAnimation(.spring()) {
+                            vm.isConfigured = false
+                        }
+                    }
                 }
                 .padding(.horizontal, 8)
                 .padding(.top, 10)
                 
                 Spacer()
                 
-                // Bouton Start / Stop
-                Button(action: toggleVM) {
+                // Bouton Start / Stop Fonctionnel
+                Button(action: {
+                    vm.toggleVM()
+                }) {
                     HStack {
-                        Image(systemName: state.isVMRunning ? "stop.fill" : "play.fill")
-                        Text(state.isVMRunning ? "Arrêter MSA" : "Démarrer MSA")
+                        if vm.isProcessing {
+                            ProgressView()
+                                .controlSize(.small)
+                                .colorInvert()
+                        } else {
+                            Image(systemName: vm.isVMRunning ? "stop.fill" : "play.fill")
+                        }
+                        Text(vm.isVMRunning ? "Arrêter MSA" : "Démarrer MSA")
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .background(state.isVMRunning ? Color.red.opacity(0.85) : Color.green.opacity(0.85))
+                    .padding(.vertical, 10)
+                    .background(vm.isVMRunning ? Color.red.opacity(0.85) : Color.green.opacity(0.85))
                     .foregroundColor(.white)
                     .cornerRadius(10)
                     .shadow(radius: 4)
                 }
                 .buttonStyle(.plain)
+                .disabled(vm.isProcessing)
                 .padding(16)
             }
             .frame(minWidth: 220, maxWidth: 240)
@@ -103,45 +132,35 @@ struct MainDashboardView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Sous-Système Android")
                                 .font(.system(size: 26, weight: .bold, design: .rounded))
-                            Text("Exécution native sans émulateur pour macOS")
+                            Text("Exécution native sans émulateur pour macOS Apple Silicon")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
                         
                         Spacer()
                         
-                        // Sélecteur de version Liquid Glass
-                        HStack(spacing: 8) {
-                            Text("Version :")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Picker("", selection: $state.selectedVersion) {
-                                ForEach(versions, id: \.self) { v in
-                                    Text("Android \(v)").tag(v)
-                                }
-                            }
-                            .frame(width: 130)
+                        // Action Ouvrir Fichier APK
+                        Button(action: selectAndInstallAPK) {
+                            Label("Ajouter un APK", systemImage: "plus.circle.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(10)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                        )
+                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 28)
                     .padding(.top, 24)
                     
-                    // Drag and Drop Zone APK
+                    // Drag and Drop Zone APK Réelle
                     ZStack {
                         RoundedRectangle(cornerRadius: 16)
                             .fill(.ultraThinMaterial)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
                                     .strokeBorder(
-                                        state.isDraggingOver ? Color.green : Color.white.opacity(0.2),
+                                        vm.isDraggingOver ? Color.green : Color.white.opacity(0.2),
                                         style: StrokeStyle(lineWidth: 1.5, dash: [6])
                                     )
                             )
@@ -152,24 +171,47 @@ struct MainDashboardView: View {
                                 .foregroundColor(.green)
                             Text("Glissez-déposez un fichier APK ici")
                                 .font(.system(size: 13, weight: .semibold))
-                            Text("Installation instantanée et intégration dans Spotlight")
+                            Text("Installation immédiate dans le sous-système Android")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
-                        .padding(.vertical, 20)
+                        .padding(.vertical, 18)
                     }
                     .padding(.horizontal, 28)
+                    .onDrop(of: ["public.file-url"], isTargeted: $vm.isDraggingOver) { providers in
+                        guard let provider = providers.first else { return false }
+                        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { urlData, _ in
+                            if let data = urlData as? Data,
+                               let path = URL(dataRepresentation: data, relativeTo: nil)?.path {
+                                DispatchQueue.main.async {
+                                    vm.installAPK(at: path)
+                                }
+                            }
+                        }
+                        return true
+                    }
                     
-                    // Applications Grid
+                    // Applications Grid Réelles
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Applications Installées")
-                            .font(.system(size: 16, weight: .bold))
-                            .padding(.horizontal, 28)
+                        HStack {
+                            Text("Applications Prêtes")
+                                .font(.system(size: 16, weight: .bold))
+                            Spacer()
+                            Text("\(vm.installedApps.count) installée(s)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 28)
                         
                         ScrollView {
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 16) {
-                                ForEach(state.installedApps, id: \.self) { app in
-                                    AppCardView(title: app)
+                                ForEach(vm.installedApps) { app in
+                                    Button(action: {
+                                        vm.launchApp(app)
+                                    }) {
+                                        RealAppCardView(app: app)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                             .padding(.horizontal, 28)
@@ -181,55 +223,67 @@ struct MainDashboardView: View {
         }
     }
     
-    func toggleVM() {
-        withAnimation(.spring()) {
-            state.isVMRunning.toggle()
+    func selectAndInstallAPK() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = []
+        
+        if panel.runModal() == .OK, let url = panel.url {
+            vm.installAPK(at: url.path)
         }
     }
 }
 
-struct SidebarButton: View {
+struct SidebarNavButton: View {
     let icon: String
     let title: String
     let isSelected: Bool
+    let action: () -> Void
     
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundColor(isSelected ? .green : .secondary)
-            Text(title)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-            Spacer()
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundColor(isSelected ? .green : .secondary)
+                Text(title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(isSelected ? Color.green.opacity(0.12) : Color.clear)
+            .cornerRadius(8)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(isSelected ? Color.green.opacity(0.12) : Color.clear)
-        .cornerRadius(8)
+        .buttonStyle(.plain)
     }
 }
 
-struct AppCardView: View {
-    let title: String
+struct RealAppCardView: View {
+    let app: AppViewModel.AndroidAppModel
     
     var body: some View {
         VStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(LinearGradient(colors: [.white.opacity(0.15), .white.opacity(0.05)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 60, height: 60)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                    .fill(
+                        LinearGradient(
+                            colors: [app.color.opacity(0.8), app.color.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                    .shadow(color: .black.opacity(0.05), radius: 6, y: 3)
+                    .frame(width: 58, height: 58)
+                    .shadow(color: app.color.opacity(0.3), radius: 6, y: 3)
                 
-                Image(systemName: "app.fill")
-                    .font(.system(size: 28))
-                    .foregroundColor(.green)
+                Image(systemName: app.iconSystemName)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundColor(.white)
             }
             
-            Text(title)
+            Text(app.name)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
         }
