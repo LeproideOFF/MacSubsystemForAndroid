@@ -24,7 +24,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
     }
     
     public weak var delegate: VMManagerDelegate?
-    private var virtualMachine: VZVirtualMachine?
+    public var virtualMachine: VZVirtualMachine?
     private var config: MSAConfig = .load()
     
     public override init() {
@@ -42,7 +42,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         let kernelAttrs = try fm.attributesOfItem(atPath: config.kernelPath)
         let kernelSize = (kernelAttrs[.size] as? UInt64) ?? 0
         if kernelSize < 1000000 {
-            throw NSError(domain: "MSA", code: 2, userInfo: [NSLocalizedDescriptionKey: "Le fichier kernel semble invalide ou corrompu (\(kernelSize) octets). Lancez 'msa setup' pour le retélécharger."])
+            throw NSError(domain: "MSA", code: 2, userInfo: [NSLocalizedDescriptionKey: "Le fichier kernel est incomplet (\(kernelSize) octets)."])
         }
     }
     
@@ -52,14 +52,15 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         let config = MSAConfig.load()
         
         // 1. CPU & Memory
-        vzConfig.cpuCount = max(2, min(config.cpuCount, VZVirtualMachineConfiguration.maximumAllowedCPUCount))
+        let maxCpu = ProcessInfo.processInfo.activeProcessorCount
+        vzConfig.cpuCount = max(2, min(config.cpuCount, maxCpu))
         let memoryBytes = config.memorySizeMB * 1024 * 1024
         vzConfig.memorySize = max(VZVirtualMachineConfiguration.minimumAllowedMemorySize,
                                   min(memoryBytes, VZVirtualMachineConfiguration.maximumAllowedMemorySize))
         
-        // 2. Linux / Android Bootloader
+        // 2. Linux Bootloader
         let bootLoader = VZLinuxBootLoader(kernelURL: URL(fileURLWithPath: config.kernelPath))
-        bootLoader.commandLine = "console=hvc0 quiet"
+        bootLoader.commandLine = "console=hvc0 quiet loglevel=3 androidboot.hardware=virtio"
         vzConfig.bootLoader = bootLoader
         
         // 3. Serial Console
@@ -89,7 +90,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
     }
     
     public func start() async throws {
-        guard case .stopped = state else { return }
+        if case .running = state { return }
         state = .starting
         
         let vzConfig = try createConfiguration()
@@ -97,12 +98,23 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         vm.delegate = self
         self.virtualMachine = vm
         
-        try await vm.start()
-        state = .running
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            vm.start { result in
+                switch result {
+                case .success:
+                    self.state = .running
+                    continuation.resume()
+                case .failure(let error):
+                    self.state = .error(error.localizedDescription)
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
     
     public func stop() async throws {
         guard let vm = virtualMachine, case .running = state else { return }
+        state = .pausing
         try await vm.stop()
         state = .stopped
     }

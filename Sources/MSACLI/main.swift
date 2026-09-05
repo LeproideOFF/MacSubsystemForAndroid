@@ -79,33 +79,18 @@ case "start":
     let currentConfig = MSAConfig.load()
     print("🚀 Initialisation du sous-système Android \(currentConfig.selectedAndroidVersion)...")
     
-    guard VZVirtualMachine.isSupported else {
-        print("❌ Virtualization.framework n'est pas supporté sur cette machine.")
-        exit(1)
-    }
-    
-    print("⚡ Vérification de la configuration VZ...")
-    do {
-        let vzConfig = try VMManager.shared.createConfiguration()
-        print("✅ Configuration VZ validée. Démarrage de la machine virtuelle...")
-        
-        let vm = VZVirtualMachine(configuration: vzConfig)
-        vm.start { result in
-            switch result {
-            case .success:
-                print("🟢 Machine virtuelle Android en cours d'exécution !")
-                print("👉 Les applications Android s'exécutent en tâche de fond.")
-                print("👉 Utilisez 'msa install <apk>' ou double-cliquez sur vos apps dans Spotlight.")
-            case .failure(let error):
-                print("❌ Échec du démarrage de la VM: \(error.localizedDescription)")
-                exit(1)
-            }
+    Task {
+        do {
+            try await VMManager.shared.start()
+            print("🟢 Machine virtuelle Android en cours d'exécution !")
+            print("👉 Les applications Android s'exécutent en tâche de fond.")
+            dispatchMain()
+        } catch {
+            print("❌ Échec du démarrage de la VM: \(error.localizedDescription)")
+            exit(1)
         }
-        dispatchMain()
-    } catch {
-        print("❌ Erreur de configuration de la VM: \(error.localizedDescription)")
-        exit(1)
     }
+    dispatchMain()
 
 case "status":
     let currentConfig = MSAConfig.load()
@@ -158,7 +143,7 @@ case "launch":
     print("▶️ Lancement de \(package)...")
     do {
         try BridgeManager.shared.launchApp(packageName: package)
-        print("✅ Application lancée.")
+        print("✅ Application lancée avec fenêtre macOS.")
     } catch {
         print("❌ Échec du lancement: \(error)")
     }

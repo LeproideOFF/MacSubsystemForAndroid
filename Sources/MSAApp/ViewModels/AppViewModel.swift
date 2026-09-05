@@ -41,29 +41,34 @@ class AppViewModel: ObservableObject {
     
     func loadDefaultApps() {
         self.installedApps = [
+            AndroidAppModel(name: "YouTube", packageName: "com.google.android.youtube", iconSystemName: "play.rectangle.fill", color: .red),
             AndroidAppModel(name: "Google Play Store", packageName: "com.android.vending", iconSystemName: "cart.fill", color: .blue),
             AndroidAppModel(name: "Paramètres Android", packageName: "com.android.settings", iconSystemName: "gearshape.fill", color: .gray),
-            AndroidAppModel(name: "Google Chrome", packageName: "com.android.chrome", iconSystemName: "globe", color: .red),
+            AndroidAppModel(name: "Google Chrome", packageName: "com.android.chrome", iconSystemName: "globe", color: .orange),
             AndroidAppModel(name: "Fichiers & Partages", packageName: "com.google.android.documentsui", iconSystemName: "folder.fill", color: .yellow)
         ]
     }
     
     func toggleVM() {
         isProcessing = true
+        let willStart = !isVMRunning
+        
         Task {
-            if isVMRunning {
-                do {
-                    try await VMManager.shared.stop()
-                    self.isVMRunning = false
-                } catch {
-                    self.alertMessage = "Erreur à l'arrêt : \(error.localizedDescription)"
-                }
-            } else {
+            if willStart {
                 do {
                     try await VMManager.shared.start()
                     self.isVMRunning = true
+                    self.alertMessage = "🟢 Sous-système Android démarré avec succès !"
                 } catch {
-                    self.alertMessage = "Erreur au démarrage : \(error.localizedDescription)"
+                    self.alertMessage = "Erreur au démarrage de la VM: \(error.localizedDescription)"
+                }
+            } else {
+                do {
+                    try await VMManager.shared.stop()
+                    self.isVMRunning = false
+                    self.alertMessage = "⚪ Sous-système Android arrêté."
+                } catch {
+                    self.alertMessage = "Erreur à l'arrêt: \(error.localizedDescription)"
                 }
             }
             self.isProcessing = false
@@ -71,15 +76,11 @@ class AppViewModel: ObservableObject {
     }
     
     func launchApp(_ app: AndroidAppModel) {
-        guard isVMRunning else {
-            alertMessage = "Veuillez d'abord démarrer le sous-système Android."
-            return
-        }
-        
         do {
             try BridgeManager.shared.launchApp(packageName: app.packageName)
+            self.alertMessage = "▶️ Lancement de \(app.name)... La fenêtre s'ouvre sur votre Mac."
         } catch {
-            alertMessage = "Ordre de lancement envoyé pour \(app.name)."
+            self.alertMessage = "Erreur lors du lancement : \(error.localizedDescription)"
         }
     }
     
@@ -110,7 +111,7 @@ class AppViewModel: ObservableObject {
         cfg.memorySizeMB = UInt64(ramGB * 1024)
         try? cfg.save()
         
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
+        Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] timer in
             guard let self = self else { timer.invalidate(); return }
             
             if self.downloadProgress < 0.35 {
@@ -136,7 +137,7 @@ class AppViewModel: ObservableObject {
                 try? process.run()
                 process.waitUntilExit()
                 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     withAnimation(.spring()) {
                         self.isDownloading = false
                         self.isConfigured = true

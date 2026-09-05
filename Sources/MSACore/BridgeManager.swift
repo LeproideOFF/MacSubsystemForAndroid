@@ -31,17 +31,7 @@ public class BridgeManager {
     
     public func isConnected() -> Bool {
         guard let output = try? executeADB(args: ["devices"]) else { return false }
-        let lines = output.components(separatedBy: "\n").filter { !$0.isEmpty }
-        // Look for our specific MSA port or valid attached Android device
-        for line in lines {
-            if (line.contains("127.0.0.1:5555") || line.contains("emulator-") || line.contains("device")) && !line.contains("List of") {
-                // Verify it's Android by checking for getprop or pm
-                if let test = try? executeADB(args: ["shell", "which", "pm"]), test.contains("pm") {
-                    return true
-                }
-            }
-        }
-        return false
+        return output.contains("device") && !output.contains("offline")
     }
     
     public func listInstalledApps() throws -> [String] {
@@ -52,12 +42,25 @@ public class BridgeManager {
     }
     
     public func launchApp(packageName: String) throws {
-        _ = try executeADB(args: [
+        // 1. Déclenche le lancement de l'activité Android
+        _ = try? executeADB(args: [
             "shell", "monkey",
             "-p", packageName,
             "-c", "android.intent.category.LAUNCHER",
             "1"
         ])
+        
+        // 2. Lance la projection de fenêtre native fluide scrcpy
+        DispatchQueue.global(qos: .userInitiated).async {
+            let scrcpy = Process()
+            scrcpy.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/scrcpy")
+            scrcpy.arguments = [
+                "--window-title", "Android App (\(packageName))",
+                "--always-on-top=false",
+                "--stay-awake"
+            ]
+            try? scrcpy.run()
+        }
     }
     
     public func installAPK(at path: String) throws -> String {
