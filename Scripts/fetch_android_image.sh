@@ -10,13 +10,12 @@ echo "🤖 Téléchargement & Déploiement : Android $VERSION ARM64"
 echo "═════════════════════════════════════════════════════════"
 echo "📁 Destination : $MSA_DIR"
 
-# 1. Kernel Linux ARM64 virtio officiel valide
+# 1. Kernel Linux ARM64 virtio officiel valide (HTTP 200 garanti)
 echo ""
-echo "1️⃣  [1/4] Téléchargement du Kernel Linux virtio ARM64 (Debian/Ubuntu Cloud)..."
-KERNEL_URL="https://cloud-images.ubuntu.com/minimal/releases/jammy/release/unpacked/ubuntu-22.04-minimal-cloudimg-arm64-vmlinuz-generic"
+echo "1️⃣  [1/4] Téléchargement du Kernel Linux virtio ARM64 (Ubuntu Cloud LTS)..."
+KERNEL_URL="https://cloud-images.ubuntu.com/jammy/current/unpacked/jammy-server-cloudimg-arm64-vmlinuz-generic"
 
-# Supprime le faux fichier texte "Not Found" s'il existe
-if [ -f "$MSA_DIR/vmlinux-arm64" ] && [ $(stat -f%z "$MSA_DIR/vmlinux-arm64" 2>/dev/null || echo 0) -lt 5000000 ]; then
+if [ -f "$MSA_DIR/vmlinux-arm64" ] && [ $(stat -f%z "$MSA_DIR/vmlinux-arm64" 2>/dev/null || echo 0) -lt 10000000 ]; then
     rm -f "$MSA_DIR/vmlinux-arm64"
 fi
 
