@@ -1,6 +1,5 @@
 import AppKit
 import Virtualization
-import MSACore
 
 public class NativeAndroidWindowController: NSWindowController {
     public static let shared = NativeAndroidWindowController()

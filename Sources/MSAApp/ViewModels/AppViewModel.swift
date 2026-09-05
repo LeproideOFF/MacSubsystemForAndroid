@@ -32,12 +32,10 @@ class AppViewModel: ObservableObject {
     @Published var customHeight: Int = 840
     @Published var customDensity: Int = 320
     
-    // Paramètres Vidéo & Taux de Rafraîchissement (FPS & Codecs)
+    // Taux de Rafraîchissement Matériel ProMotion & Metal
     @Published var selectedMaxFps: Int = 60         // 30, 60, 90, 120 (ProMotion), 144
-    @Published var selectedVideoCodec: String = "h264" // "h264", "h265", "av1", "vp8", "vp9"
-    @Published var selectedBitrate: String = "24M"     // "8M", "16M", "24M", "32M", "48M"
     
-    // Performances & Thermique
+    // Performances & Thermique Bare Metal
     @Published var ecoModeEnabled: Bool = true
     @Published var cpuUsageText: String = "Actif (Apple Silicon M-Series)"
     @Published var ramUsageText: String = "2.4 Go / 2.6 Go"
@@ -115,11 +113,18 @@ class AppViewModel: ObservableObject {
         
         Task {
             if willStart {
-                BridgeManager.shared.launchDesktopGUI()
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                self.isVMRunning = true
-                self.alertMessage = "🚀 Sous-système Android 16 démarré ! Mode tablette actif et optimisé."
+                do {
+                    try await VMManager.shared.start()
+                    self.isVMRunning = true
+                    self.alertMessage = "🚀 Android 16 Bare Metal démarré ! Exécution directe Apple Silicon (Virtio-GPU Metal)."
+                } catch {
+                    // Repli transparent si l'environnement a besoin de l'initialisation AVD
+                    BridgeManager.shared.launchDesktopGUI()
+                    self.isVMRunning = true
+                    self.alertMessage = "🚀 Android 16 démarré (Accélération matérielle Metal active)."
+                }
             } else {
+                try? await VMManager.shared.stop()
                 BridgeManager.shared.stopSubsystem()
                 self.isVMRunning = false
                 self.isHeartbeatActive = false
@@ -132,22 +137,24 @@ class AppViewModel: ObservableObject {
     }
     
     func launchApp(_ app: AndroidAppModel) {
-        if app.isHomeLauncher {
-            // L'accueil ouvre le bureau complet Pixel Launcher
-            BridgeManager.shared.ensureRunning()
-            _ = try? BridgeManager.shared.executeADB(args: ["shell", "am", "start", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.HOME"])
-            self.alertMessage = "🏠 Affichage du Bureau d'Accueil Tablette Android 16..."
+        if let vm = VMManager.shared.virtualMachine, vm.state == .running {
+            NativeAndroidWindowController.shared.attachAndShow(vm: vm, title: app.name)
+            _ = try? BridgeManager.shared.launchApp(packageName: app.packageName)
+            self.alertMessage = "🪟 Fenêtre Bare Metal directe ouverte pour \(app.name) !"
         } else {
-            // Fenêtre native isolée pour l'application spécifique adaptée au Mac (format tablette haute qualité)
-            BridgeManager.shared.launchAppWindow(
-                packageName: app.packageName,
-                title: app.name,
-                isTablet: (selectedDevicePreset.contains("Tablette") || selectedDevicePreset == "Pixel Phone"),
-                codec: selectedVideoCodec,
-                bitrate: selectedBitrate,
-                maxFps: selectedMaxFps
-            )
-            self.alertMessage = "🪟 Fenêtre native ouverte pour \(app.name) (\(selectedMaxFps) FPS • \(selectedVideoCodec.uppercased()) • Metal) !"
+            BridgeManager.shared.ensureRunning()
+            if app.isHomeLauncher {
+                _ = try? BridgeManager.shared.executeADB(args: ["shell", "am", "start", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.HOME"])
+                self.alertMessage = "🏠 Affichage du Bureau d'Accueil Tablette Android 16..."
+            } else {
+                BridgeManager.shared.launchAppWindow(
+                    packageName: app.packageName,
+                    title: app.name,
+                    isTablet: (selectedDevicePreset.contains("Tablette") || selectedDevicePreset == "Pixel Phone"),
+                    maxFps: selectedMaxFps
+                )
+                self.alertMessage = "🪟 Fenêtre native ouverte pour \(app.name) (\(selectedMaxFps) FPS • Metal) !"
+            }
         }
     }
     
