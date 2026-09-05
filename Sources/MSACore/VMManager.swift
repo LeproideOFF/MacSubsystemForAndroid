@@ -41,8 +41,9 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         
         let kernelAttrs = try fm.attributesOfItem(atPath: config.kernelPath)
         let kernelSize = (kernelAttrs[.size] as? UInt64) ?? 0
-        if kernelSize == 0 {
-            throw NSError(domain: "MSA", code: 2, userInfo: [NSLocalizedDescriptionKey: "Le fichier kernel est vide (0 octets) : \(config.kernelPath). Veuillez télécharger une image kernel ARM64 valide."])
+        if kernelSize < 1000000 {
+            // Fichier trop petit ou page HTML/texte 404
+            throw NSError(domain: "MSA", code: 2, userInfo: [NSLocalizedDescriptionKey: "Le fichier kernel semble invalide ou corrompu (\(kernelSize) octets). Lancez 'msa setup' pour le retélécharger."])
         }
     }
     
@@ -62,7 +63,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         let fm = FileManager.default
         if fm.fileExists(atPath: config.initrdPath) {
             let initrdSize = ((try? fm.attributesOfItem(atPath: config.initrdPath)[.size] as? UInt64) ?? 0)
-            if initrdSize > 0 {
+            if initrdSize > 100000 {
                 bootLoader.initialRamdiskURL = URL(fileURLWithPath: config.initrdPath)
             }
         }
@@ -94,7 +95,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         
         if fm.fileExists(atPath: config.systemImagePath) {
             let sysSize = ((try? fm.attributesOfItem(atPath: config.systemImagePath)[.size] as? UInt64) ?? 0)
-            if sysSize > 0 {
+            if sysSize > 1000000 {
                 let systemAttachment = try VZDiskImageStorageDeviceAttachment(
                     url: URL(fileURLWithPath: config.systemImagePath),
                     readOnly: true
