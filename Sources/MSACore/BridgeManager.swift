@@ -89,18 +89,17 @@ public class BridgeManager {
         let scrcpy = Process()
         scrcpy.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/scrcpy")
         
+        let displaySize = isTablet ? "1200x800" : "540x960"
         let args = [
             "-s", "emulator-5554",
             "--window-title", title,
             "--start-app", packageName,
-            "--new-display",
+            "--new-display=\(displaySize)",
             "--flex-display",
             "--video-codec=h265",
             "-b", "32M",
             "--max-fps", "60",
-            "--no-audio",
-            "--window-width", isTablet ? "1080" : "540",
-            "--window-height", isTablet ? "720" : "960"
+            "--no-audio"
         ]
         
         scrcpy.arguments = args
