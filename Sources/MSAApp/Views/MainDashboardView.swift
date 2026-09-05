@@ -53,15 +53,27 @@ struct DashboardContent: View {
                 
                 Divider().opacity(0.3).padding(.horizontal, 16)
                 
-                // Status Pill
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(vm.isVMRunning ? Color.green : Color.orange)
-                        .frame(width: 9, height: 9)
-                        .shadow(color: vm.isVMRunning ? .green : .orange, radius: 4)
-                    Text(vm.isVMRunning ? "Sous-système Actif" : "En veille / Arrêté")
-                        .font(.system(size: 12, weight: .medium))
-                    Spacer()
+                // Status & Ping 20s Pill
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(vm.isHeartbeatActive ? Color.green : Color.orange)
+                            .frame(width: 9, height: 9)
+                            .shadow(color: vm.isHeartbeatActive ? .green : .orange, radius: 4)
+                        Text(vm.isHeartbeatActive ? "Sous-système Actif" : "En veille / Arrêté")
+                            .font(.system(size: 12, weight: .semibold))
+                        Spacer()
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "bolt.horizontal.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(vm.isHeartbeatActive ? .green : .secondary)
+                        Text(vm.lastPingTime)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)

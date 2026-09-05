@@ -18,6 +18,11 @@ class AppViewModel: ObservableObject {
     @Published var isProcessing: Bool = false
     @Published var isDraggingOver: Bool = false
     
+    // Heartbeat & Ping 20s
+    @Published var lastPingTime: String = "Non connecté"
+    @Published var isHeartbeatActive: Bool = false
+    private var pingTimer: Timer?
+    
     struct AndroidAppModel: Identifiable, Hashable {
         let id = UUID()
         let name: String
@@ -37,6 +42,39 @@ class AppViewModel: ObservableObject {
         self.isConfigured = kernelExists && kernelSize > 10000000
         
         loadDefaultApps()
+        startHeartbeat()
+    }
+    
+    func startHeartbeat() {
+        pingTimer?.invalidate()
+        // Ping du système toutes les 20 secondes
+        pingTimer = Timer.scheduledTimer(withTimeInterval: 20.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.pingSubsystem()
+            }
+        }
+        // Ping initial immédiat
+        pingSubsystem()
+    }
+    
+    func pingSubsystem() {
+        let connected = BridgeManager.shared.isConnected()
+        let vmState = VMManager.shared.state
+        
+        if case .running = vmState, connected {
+            self.isHeartbeatActive = true
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            self.lastPingTime = "En ligne • \(formatter.string(from: Date())) (Ping OK 20s)"
+        } else if case .running = vmState {
+            self.isHeartbeatActive = true
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            self.lastPingTime = "VM active (Boot) • \(formatter.string(from: Date()))"
+        } else {
+            self.isHeartbeatActive = false
+            self.lastPingTime = "Sous-système en veille"
+        }
     }
     
     func loadDefaultApps() {
@@ -58,6 +96,7 @@ class AppViewModel: ObservableObject {
                 do {
                     try await VMManager.shared.start()
                     self.isVMRunning = true
+                    self.pingSubsystem()
                     self.alertMessage = "🟢 Sous-système Android démarré avec succès !"
                 } catch {
                     self.alertMessage = "Erreur au démarrage de la VM: \(error.localizedDescription)"
@@ -66,6 +105,7 @@ class AppViewModel: ObservableObject {
                 do {
                     try await VMManager.shared.stop()
                     self.isVMRunning = false
+                    self.pingSubsystem()
                     self.alertMessage = "⚪ Sous-système Android arrêté."
                 } catch {
                     self.alertMessage = "Erreur à l'arrêt: \(error.localizedDescription)"
@@ -141,6 +181,7 @@ class AppViewModel: ObservableObject {
                     withAnimation(.spring()) {
                         self.isDownloading = false
                         self.isConfigured = true
+                        self.startHeartbeat()
                     }
                 }
             }
