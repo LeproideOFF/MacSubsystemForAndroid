@@ -10,7 +10,7 @@ echo "🤖 Téléchargement & Déploiement : Android $VERSION ARM64"
 echo "═════════════════════════════════════════════════════════"
 echo "📁 Destination : $MSA_DIR"
 
-# 1. Kernel Linux ARM64 (Linux kernel ARM64 boot executable Image)
+# 1. Kernel Linux ARM64
 echo ""
 echo "1️⃣  [1/4] Téléchargement & Décompression du Kernel Linux ARM64..."
 KERNEL_URL="https://cloud-images.ubuntu.com/jammy/current/unpacked/jammy-server-cloudimg-arm64-vmlinuz-generic"
@@ -28,17 +28,21 @@ else
     echo "    ✅ Kernel ARM64 décompressé déjà en cache."
 fi
 
-# 2. Vraie Image Système Android ARM64 avec OpenGApps
+# 2. Vraie Image Système Android ARM64 avec OpenGApps (Nettoyage si < 500 Mo)
 echo ""
 echo "2️⃣  [2/4] Téléchargement de la vraie image système Android AOSP + OpenGApps..."
-# Image système officielle LineageOS/Waydroid AOSP ARM64 avec GAPPS inclus
 SYSTEM_ZIP_URL="https://downloads.sourceforge.net/project/waydroid/images/system/lineage/waydroid_arm64/lineage-18.1-20231209-GAPPS-waydroid_arm64-system.zip"
 
-if [ ! -f "$MSA_DIR/system.img" ] || [ $(stat -f%z "$MSA_DIR/system.img" 2>/dev/null || echo 0) -lt 500000000 ]; then
+SYSTEM_SIZE=0
+if [ -f "$MSA_DIR/system.img" ]; then
+    SYSTEM_SIZE=$(stat -f%z "$MSA_DIR/system.img" 2>/dev/null || echo 0)
+fi
+
+if [ "$SYSTEM_SIZE" -lt 500000000 ]; then
     rm -f "$MSA_DIR/system.img"
-    echo "    ⬇️ Téléchargement de l'archive AOSP ARM64 (environ 800 Mo)..."
+    echo "    ⬇️ Téléchargement des données complètes d'Android (~800 Mo)..."
     curl -L --fail --progress-bar -o "$MSA_DIR/system.zip" "$SYSTEM_ZIP_URL"
-    echo "    📦 Extraction de system.img..."
+    echo "    📦 Extraction de system.img vers le disque..."
     unzip -p "$MSA_DIR/system.zip" system.img > "$MSA_DIR/system.img"
     rm -f "$MSA_DIR/system.zip"
     echo "    ✅ Image système Android AOSP ARM64 réelle installée ($(du -h "$MSA_DIR/system.img" | cut -f1))."
