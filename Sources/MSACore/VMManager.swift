@@ -110,6 +110,19 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         let socketDevice = VZVirtioSocketDeviceConfiguration()
         vzConfig.socketDevices = [socketDevice]
         
+        // 8. Bare Metal Graphics (Virtio-GPU Metal Scanout Zéro-Vidéo)
+        let graphicsDevice = VZVirtioGraphicsDeviceConfiguration()
+        let scanout = VZVirtioGraphicsScanoutConfiguration(widthInPixels: 1920, heightInPixels: 1200)
+        graphicsDevice.scanouts = [scanout]
+        vzConfig.graphicsDevices = [graphicsDevice]
+        
+        // 9. Bare Metal Pointer & Keyboard (Entrées directes sans ADB)
+        let pointingDevice = VZUSBScreenCoordinatePointingDeviceConfiguration()
+        vzConfig.pointingDevices = [pointingDevice]
+        
+        let keyboardDevice = VZUSBKeyboardConfiguration()
+        vzConfig.keyboards = [keyboardDevice]
+        
         try vzConfig.validate()
         return vzConfig
     }
@@ -130,6 +143,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
                     switch result {
                     case .success:
                         self.state = .running
+                        NativeAndroidWindowController.shared.attachAndShow(vm: vm, title: "Android 16 • Bare Metal (Metal Graphics)")
                         continuation.resume()
                     case .failure(let error):
                         self.state = .error(error.localizedDescription)
