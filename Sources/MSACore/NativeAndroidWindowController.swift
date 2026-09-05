@@ -8,15 +8,15 @@ public class NativeAndroidWindowController: NSWindowController {
     
     public init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 100, y: 100, width: 1080, height: 720),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            contentRect: NSRect(x: 120, y: 120, width: 1280, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Android 16 • Bare Metal (Metal Graphics)"
-        window.titlebarAppearsTransparent = true
+        window.backgroundColor = .black
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 480, height: 320)
+        window.minSize = NSSize(width: 640, height: 400)
         
         super.init(window: window)
         setupView()
@@ -29,27 +29,25 @@ public class NativeAndroidWindowController: NSWindowController {
     private func setupView() {
         guard let window = self.window else { return }
         
-        let containerView = NSView(frame: window.contentView?.bounds ?? .zero)
-        containerView.autoresizingMask = [.width, .height]
-        
-        let virtualView = VZVirtualMachineView(frame: containerView.bounds)
+        let virtualView = VZVirtualMachineView(frame: window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 1280, height: 800))
         virtualView.autoresizingMask = [.width, .height]
         virtualView.capturesSystemKeys = true
         
-        // Attacher l'instance de machine virtuelle Bare Metal
         if let vm = VMManager.shared.virtualMachine {
             virtualView.virtualMachine = vm
         }
         
         self.vzView = virtualView
-        containerView.addSubview(virtualView)
-        window.contentView = containerView
+        window.contentView = virtualView
     }
     
     public func attachAndShow(vm: VZVirtualMachine, title: String = "Android 16 • Bare Metal") {
         DispatchQueue.main.async { [weak self] in
             guard let self = self, let window = self.window else { return }
             window.title = title
+            if self.vzView == nil {
+                self.setupView()
+            }
             self.vzView?.virtualMachine = vm
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
