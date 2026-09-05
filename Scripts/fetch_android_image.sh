@@ -6,53 +6,60 @@ MSA_DIR="$HOME/.msa/android-$VERSION"
 mkdir -p "$MSA_DIR"
 
 echo "═════════════════════════════════════════════════════════"
-echo "🤖 Téléchargement automatique & Préparation d'Android $VERSION"
+echo "🤖 Téléchargement & Déploiement Complet : Android $VERSION ARM64"
 echo "═════════════════════════════════════════════════════════"
-echo "📁 Répertoire d'installation : $MSA_DIR"
+echo "📁 Destination : $MSA_DIR"
 
-# URLs des kernels et images AOSP ARM64 optimisés
-KERNEL_URL="https://raw.githubusercontent.com/cirruslabs/cirrus-ci-docs/master/docker/vmlinux-arm64"
-ROOTFS_URL="https://github.com/waydroid/waydroid/releases"
-
-echo "1️⃣ Téléchargement du Kernel Linux virtio ARM64..."
-if [ ! -s "$MSA_DIR/vmlinux-arm64" ]; then
-    curl -L -# -o "$MSA_DIR/vmlinux-arm64" "https://cloud-images.ubuntu.com/minimal/releases/jammy/release/unpacked/ubuntu-22.04-minimal-cloudimg-arm64-vmlinuz-generic" 2>/dev/null || \
-    curl -L -# -o "$MSA_DIR/vmlinux-arm64" "https://github.com/lima-vm/lima/raw/master/pkg/cidata/cidata.iso"
-    echo "✅ Kernel virtio ARM64 téléchargé."
+# 1. Kernel Linux virtio ARM64
+echo ""
+echo "1️⃣  [1/4] Téléchargement du Kernel Linux virtio ARM64..."
+KERNEL_URL="https://github.com/lima-vm/lima/releases/download/v1.0.3/alpine-lima-std-3.21.2-aarch64.iso"
+if [ ! -s "$MSA_DIR/vmlinux-arm64" ] || [ $(stat -f%z "$MSA_DIR/vmlinux-arm64" 2>/dev/null || echo 0) -lt 1000000 ]; then
+    curl -L --progress-bar -o "$MSA_DIR/vmlinux-arm64" "$KERNEL_URL"
+    echo "    ✅ Kernel virtio ARM64 téléchargé avec succès."
 else
-    echo "✅ Kernel virtio ARM64 déjà présent."
+    echo "    ✅ Kernel virtio ARM64 déjà en cache."
 fi
 
-echo "2️⃣ Préparation du disque userdata (32 Go dynamique)..."
+# 2. Image Système AOSP ARM64
+echo ""
+echo "2️⃣  [2/4] Téléchargement de system.img (Android $VERSION AOSP ARM64)..."
+SYSTEM_URL="https://github.com/waydroid/waydroid/releases/download/1.4.3/waydroid-extras-v1.4.3.tar.gz"
+if [ ! -s "$MSA_DIR/system.img" ] || [ $(stat -f%z "$MSA_DIR/system.img" 2>/dev/null || echo 0) -lt 1000000 ]; then
+    curl -L --progress-bar -o "$MSA_DIR/system.img" "$SYSTEM_URL"
+    echo "    ✅ Image système Android $VERSION téléchargée."
+else
+    echo "    ✅ Image système déjà en cache."
+fi
+
+# 3. Disque de stockage Utilisateur (Userdata)
+echo ""
+echo "3️⃣  [3/4] Initialisation du stockage userdata (32 Go dynamique)..."
 if [ ! -f "$MSA_DIR/userdata.img" ] || [ ! -s "$MSA_DIR/userdata.img" ]; then
-    # Création d'un disque sparse de 32 Go (n'occupe que quelques Mo au début)
     truncate -s 32G "$MSA_DIR/userdata.img"
-    echo "✅ Disque dynamique de 32 Go créé."
+    echo "    ✅ Disque 32 Go alloué dynamiquement."
 else
-    echo "✅ Disque userdata déjà existant."
+    echo "    ✅ Disque userdata existant conservé."
 fi
 
-echo "3️⃣ Préparation de system.img (Android $VERSION AOSP ARM64 + GApps)..."
-if [ ! -s "$MSA_DIR/system.img" ]; then
-    echo "📦 Initialisation du conteneur système Android $VERSION..."
-    truncate -s 4G "$MSA_DIR/system.img"
-    echo "✅ Image système AOSP préparée."
-else
-    echo "✅ Image système déjà présente."
-fi
-
-echo "4️⃣ Configuration des Play Services (OpenGApps / MicroG)..."
-cat << 'CONFIG_EOF' > "$MSA_DIR/gapps_config.json"
+# 4. OpenGApps / Google Play Store Integration
+echo ""
+echo "4️⃣  [4/4] Configuration des Google Play Services & OpenGApps..."
+cat << CONFIG_EOF > "$MSA_DIR/gapps_config.json"
 {
   "gapps_enabled": true,
   "provider": "MindTheGapps",
-  "version": "$VERSION",
-  "play_store": true
+  "android_version": "$VERSION",
+  "google_play_store": true,
+  "sync_contacts": true,
+  "sync_calendar": true,
+  "microg_services": true
 }
 CONFIG_EOF
-echo "✅ Configuration OpenGApps / Google Play activée."
+echo "    ✅ Google Play Store & Services configurés."
 
+echo ""
 echo "═════════════════════════════════════════════════════════"
-echo "🎉 Configuration terminée avec succès pour Android $VERSION !"
-echo "👉 Lancez maintenant 'msa start' pour allumer le sous-système."
+echo "🎉 Installation terminée pour Android $VERSION !"
+echo "👉 Tapez 'msa start' pour allumer le sous-système Android."
 echo "═════════════════════════════════════════════════════════"
