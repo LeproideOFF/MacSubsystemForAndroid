@@ -81,8 +81,7 @@ public class BridgeManager {
     }
     
     public func launchAppWindow(packageName: String, title: String, isTablet: Bool = true) {
-        // Démarre l'app dans une fenêtre macOS native avec flex-display pour s'adapter à la taille de la fenêtre
-        // Résolution haute qualité Retina sans déformation, format tablette Mac
+        // Démarre l'app dans un affichage virtuel indépendant dédié avec format tablette Mac Retina
         ensureRunning()
         
         let scrcpy = Process()
@@ -94,14 +93,23 @@ public class BridgeManager {
             "--start-app", packageName,
             "--max-fps", "60",
             "--video-codec", "h264",
-            "--no-audio",
-            "--flex-display" // Permet à Android de s'adapter automatiquement aux dimensions de la fenêtre redimensionnée
+            "--no-audio"
         ]
         
         if isTablet {
-            args += ["--window-width", "960", "--window-height", "640"]
+            args += [
+                "--new-display=1280x800/240",
+                "--flex-display",
+                "--window-width", "960",
+                "--window-height", "640"
+            ]
         } else {
-            args += ["--window-width", "420", "--window-height", "840"]
+            args += [
+                "--new-display=420x840/320",
+                "--flex-display",
+                "--window-width", "420",
+                "--window-height", "840"
+            ]
         }
         
         scrcpy.arguments = args
