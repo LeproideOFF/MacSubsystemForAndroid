@@ -81,36 +81,27 @@ public class BridgeManager {
     }
     
     public func launchAppWindow(packageName: String, title: String, isTablet: Bool = true) {
-        // Démarre l'app dans un affichage virtuel indépendant dédié avec format tablette Mac Retina
+        // Démarre l'app dans un affichage virtuel indépendant dédié avec format Retina
+        // --new-display + --flex-display redimensionne dynamiquement l'écran Android
+        // pour correspondre EXACTEMENT aux proportions de la fenêtre sans bandes noires (zéro bordure)
         ensureRunning()
         
         let scrcpy = Process()
         scrcpy.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/scrcpy")
         
-        var args = [
+        let args = [
             "-s", "emulator-5554",
             "--window-title", title,
             "--start-app", packageName,
+            "--new-display",
+            "--flex-display",
+            "--video-codec=h265",
+            "-b", "32M",
             "--max-fps", "60",
-            "--video-codec", "h264",
-            "--no-audio"
+            "--no-audio",
+            "--window-width", isTablet ? "1080" : "540",
+            "--window-height", isTablet ? "720" : "960"
         ]
-        
-        if isTablet {
-            args += [
-                "--new-display=1280x800/240",
-                "--flex-display",
-                "--window-width", "960",
-                "--window-height", "640"
-            ]
-        } else {
-            args += [
-                "--new-display=420x840/320",
-                "--flex-display",
-                "--window-width", "420",
-                "--window-height", "840"
-            ]
-        }
         
         scrcpy.arguments = args
         try? scrcpy.run()
