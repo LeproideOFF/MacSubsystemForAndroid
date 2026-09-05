@@ -41,33 +41,27 @@ public class BridgeManager {
             .map { $0.replacingOccurrences(of: "package:", with: "").trimmingCharacters(in: .whitespacesAndNewlines) }
     }
     
+    public func launchDesktopGUI() {
+        let script = "/Users/mathias/Documents/MacSubsystemForAndroid/Scripts/launch_android16_gui.sh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [script]
+        try? process.run()
+    }
+    
     public func launchApp(packageName: String) throws {
-        // 1. Déclenche le lancement de l'activité Android
-        _ = try? executeADB(args: [
-            "shell", "monkey",
-            "-p", packageName,
-            "-c", "android.intent.category.LAUNCHER",
-            "1"
-        ])
-        
-        // 2. Lance la projection de fenêtre native fluide scrcpy
-        DispatchQueue.global(qos: .userInitiated).async {
-            let scrcpy = Process()
-            scrcpy.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/scrcpy")
-            scrcpy.arguments = [
-                "--window-title", "Android App (\(packageName))",
-                "--always-on-top=false",
-                "--stay-awake"
-            ]
-            try? scrcpy.run()
+        launchDesktopGUI()
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 2.0) {
+            _ = try? self.executeADB(args: [
+                "shell", "monkey",
+                "-p", packageName,
+                "-c", "android.intent.category.LAUNCHER",
+                "1"
+            ])
         }
     }
     
     public func installAPK(at path: String) throws -> String {
         return try executeADB(args: ["install", "-r", "-g", path])
-    }
-    
-    public func uninstallApp(packageName: String) throws -> String {
-        return try executeADB(args: ["uninstall", packageName])
     }
 }

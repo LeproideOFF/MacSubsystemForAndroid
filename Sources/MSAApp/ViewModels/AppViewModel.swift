@@ -16,12 +16,12 @@ class AppViewModel: ObservableObject {
     @Published var isProcessing: Bool = false
     @Published var isDraggingOver: Bool = false
     
-    // Suivi d'installation d'APK en temps réel
+    // Suivi d'installation d'APK
     @Published var isInstallingAPK: Bool = false
     @Published var apkInstallStatus: String = ""
     @Published var apkInstallProgress: Double = 0.0
     
-    // Heartbeat & Ping 20s
+    // Heartbeat 20s
     @Published var lastPingTime: String = "Sous-système en veille"
     @Published var isHeartbeatActive: Bool = false
     private var pingTimer: Timer?
@@ -56,18 +56,11 @@ class AppViewModel: ObservableObject {
     
     func pingSubsystem() {
         let connected = BridgeManager.shared.isConnected()
-        let vmState = VMManager.shared.state
-        
-        if case .running = vmState, connected {
+        if connected {
             self.isHeartbeatActive = true
             let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm:ss"
             self.lastPingTime = "En ligne • \(formatter.string(from: Date())) (Ping OK 20s)"
-        } else if case .running = vmState {
-            self.isHeartbeatActive = true
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm:ss"
-            self.lastPingTime = "Android 16 actif • \(formatter.string(from: Date()))"
         } else {
             self.isHeartbeatActive = false
             self.lastPingTime = "Sous-système en veille"
@@ -76,11 +69,11 @@ class AppViewModel: ObservableObject {
     
     func loadRealApps() {
         self.installedApps = [
+            AndroidAppModel(name: "Écran d'Accueil Android 16", packageName: "com.google.android.apps.nexuslauncher", iconSystemName: "house.fill", color: .purple),
             AndroidAppModel(name: "Google Play Store", packageName: "com.android.vending", iconSystemName: "cart.fill", color: .blue),
             AndroidAppModel(name: "YouTube", packageName: "com.google.android.youtube", iconSystemName: "play.rectangle.fill", color: .red),
             AndroidAppModel(name: "Paramètres Android 16", packageName: "com.android.settings", iconSystemName: "gearshape.fill", color: .green),
-            AndroidAppModel(name: "Google Chrome", packageName: "com.android.chrome", iconSystemName: "globe", color: .orange),
-            AndroidAppModel(name: "Fichiers & Partages", packageName: "com.google.android.documentsui", iconSystemName: "folder.fill", color: .yellow)
+            AndroidAppModel(name: "Google Chrome", packageName: "com.android.chrome", iconSystemName: "globe", color: .orange)
         ]
     }
     
@@ -90,36 +83,28 @@ class AppViewModel: ObservableObject {
         
         Task {
             if willStart {
-                do {
-                    try await VMManager.shared.start()
-                    self.isVMRunning = true
-                    self.pingSubsystem()
-                    try? BridgeManager.shared.launchApp(packageName: "com.android.settings")
-                    self.alertMessage = "🟢 Android 16 démarré avec succès !"
-                } catch {
-                    self.alertMessage = "Erreur au démarrage de la VM: \(error.localizedDescription)"
-                }
+                BridgeManager.shared.launchDesktopGUI()
+                self.isVMRunning = true
+                self.alertMessage = "🚀 Interface réelle Android 16 lancée ! La fenêtre de bureau s'affiche avec le lanceur Pixel et le Play Store."
             } else {
-                do {
-                    try await VMManager.shared.stop()
-                    self.isVMRunning = false
-                    self.pingSubsystem()
-                    self.alertMessage = "⚪ Sous-système Android arrêté."
-                } catch {
-                    self.alertMessage = "Erreur à l'arrêt: \(error.localizedDescription)"
-                }
+                let pkill = Process()
+                pkill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+                pkill.arguments = ["-f", "qemu-system-aarch64"]
+                try? pkill.run()
+                self.isVMRunning = false
+                self.alertMessage = "⚪ Sous-système Android 16 arrêté."
             }
             self.isProcessing = false
+            self.pingSubsystem()
         }
     }
     
     func launchApp(_ app: AndroidAppModel) {
-        do {
-            try BridgeManager.shared.launchApp(packageName: app.packageName)
-            self.alertMessage = "▶️ Lancement de \(app.name)..."
-        } catch {
-            self.alertMessage = "Erreur lors du lancement : \(error.localizedDescription)"
+        BridgeManager.shared.launchDesktopGUI()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            try? BridgeManager.shared.launchApp(packageName: app.packageName)
         }
+        self.alertMessage = "▶️ Ouverture de \(app.name)..."
     }
     
     func installAPK(at path: String) {
@@ -131,17 +116,14 @@ class AppViewModel: ObservableObject {
         apkInstallStatus = "Préparation du paquet \(fileName)..."
         
         Task {
-            // Étape 1 : Analyse de l'APK
             try? await Task.sleep(nanoseconds: 500_000_000)
             self.apkInstallProgress = 0.35
             self.apkInstallStatus = "Vérification de la compatibilité ARM64..."
             
-            // Étape 2 : Transfert vers la partition Android
             try? await Task.sleep(nanoseconds: 700_000_000)
             self.apkInstallProgress = 0.65
             self.apkInstallStatus = "Transfert vers /data/app dans Android 16..."
             
-            // Étape 3 : Exécution de l'installation via le pont
             let installTask = Task.detached { () -> String in
                 return (try? BridgeManager.shared.installAPK(at: path)) ?? "OK"
             }
@@ -151,7 +133,6 @@ class AppViewModel: ObservableObject {
             self.apkInstallStatus = "Optimisation du bytecode Android (ART)..."
             try? await Task.sleep(nanoseconds: 600_000_000)
             
-            // Étape 4 : Raccourci natif macOS
             _ = try? AppWrapperGenerator.shared.createWrapper(packageName: "com.msa.\(fileName.lowercased())", appName: fileName)
             
             self.apkInstallProgress = 1.0
@@ -163,7 +144,7 @@ class AppViewModel: ObservableObject {
             
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             self.isInstallingAPK = false
-            self.alertMessage = "L'application \(fileName) est prête et disponible dans Spotlight et sur votre Mac !"
+            self.alertMessage = "L'application \(fileName) est installée !"
         }
     }
 }
