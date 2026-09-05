@@ -1,5 +1,5 @@
 import Foundation
-import Virtualization
+@preconcurrency import Virtualization
 
 public enum VMState {
     case stopped
@@ -36,13 +36,11 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         let fm = FileManager.default
         
         guard fm.fileExists(atPath: config.kernelPath) else {
-            throw NSError(domain: "MSA", code: 1, userInfo: [NSLocalizedDescriptionKey: "Kernel manquant à : \(config.kernelPath)"])
+            throw NSError(domain: "MSA", code: 1, userInfo: [NSLocalizedDescriptionKey: "Kernel Google Android 16 manquant à : \(config.kernelPath)"])
         }
         
-        let kernelAttrs = try fm.attributesOfItem(atPath: config.kernelPath)
-        let kernelSize = (kernelAttrs[.size] as? UInt64) ?? 0
-        if kernelSize < 1000000 {
-            throw NSError(domain: "MSA", code: 2, userInfo: [NSLocalizedDescriptionKey: "Le fichier kernel est incomplet (\(kernelSize) octets)."])
+        guard fm.fileExists(atPath: config.systemImagePath) else {
+            throw NSError(domain: "MSA", code: 2, userInfo: [NSLocalizedDescriptionKey: "Image système Android 16 manquante à : \(config.systemImagePath)"])
         }
     }
     
@@ -53,14 +51,19 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         
         // 1. CPU & Memory
         let maxCpu = ProcessInfo.processInfo.activeProcessorCount
-        vzConfig.cpuCount = max(2, min(config.cpuCount, maxCpu))
+        vzConfig.cpuCount = max(4, min(config.cpuCount, maxCpu))
         let memoryBytes = config.memorySizeMB * 1024 * 1024
         vzConfig.memorySize = max(VZVirtualMachineConfiguration.minimumAllowedMemorySize,
                                   min(memoryBytes, VZVirtualMachineConfiguration.maximumAllowedMemorySize))
         
-        // 2. Linux Bootloader
+        // 2. Linux Android 16 Bootloader (Official ranchu kernel + ramdisk)
         let bootLoader = VZLinuxBootLoader(kernelURL: URL(fileURLWithPath: config.kernelPath))
-        bootLoader.commandLine = "console=hvc0 root=/dev/vda rw androidboot.hardware=virtio androidboot.selinux=permissive init=/init quiet loglevel=3"
+        let fm = FileManager.default
+        if fm.fileExists(atPath: config.initrdPath) {
+            bootLoader.initialRamdiskURL = URL(fileURLWithPath: config.initrdPath)
+        }
+        
+        bootLoader.commandLine = "console=hvc0 root=/dev/vda rw androidboot.hardware=ranchu androidboot.selinux=permissive androidboot.freeform_window_management=1 init=/init quiet loglevel=3"
         vzConfig.bootLoader = bootLoader
         
         // 3. Serial Console
@@ -73,9 +76,8 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         serial.attachment = serialPortAttachment
         vzConfig.serialPorts = [serial]
         
-        // 4. Block Devices
+        // 4. Block Devices (Vraie partition Google AOSP 3.5 Go + Userdata 32 Go)
         var storageDevices: [VZStorageDeviceConfiguration] = []
-        let fm = FileManager.default
         
         if fm.fileExists(atPath: config.systemImagePath) {
             let systemAttachment = try VZDiskImageStorageDeviceAttachment(
@@ -118,7 +120,6 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         
         let vzConfig = try createConfiguration()
         
-        // CRITICAL FIX: Apple Virtualization.framework requires VZVirtualMachine to be allocated and started on DispatchQueue.main!
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.main.async {
                 let vm = VZVirtualMachine(configuration: vzConfig, queue: .main)

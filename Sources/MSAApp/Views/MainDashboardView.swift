@@ -5,19 +5,13 @@ struct MainDashboardView: View {
     @StateObject private var vm = AppViewModel()
     
     var body: some View {
-        Group {
-            if !vm.isConfigured {
-                SetupWizardView(vm: vm)
-            } else {
-                DashboardContent(vm: vm)
+        DashboardContent(vm: vm)
+            .alert(isPresented: Binding(
+                get: { vm.alertMessage != nil },
+                set: { if !$0 { vm.alertMessage = nil } }
+            )) {
+                Alert(title: Text("Mac Subsystem for Android 16"), message: Text(vm.alertMessage ?? ""), dismissButton: .default(Text("OK")))
             }
-        }
-        .alert(isPresented: Binding(
-            get: { vm.alertMessage != nil },
-            set: { if !$0 { vm.alertMessage = nil } }
-        )) {
-            Alert(title: Text("Mac Subsystem for Android"), message: Text(vm.alertMessage ?? ""), dismissButton: .default(Text("OK")))
-        }
     }
 }
 
@@ -41,9 +35,9 @@ struct DashboardContent: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Android Subsystem")
+                        Text("Android 16 Subsystem")
                             .font(.system(size: 14, weight: .bold))
-                        Text("Android \(vm.selectedVersion) ARM64")
+                        Text("Google AOSP ARM64")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
@@ -83,16 +77,11 @@ struct DashboardContent: View {
                 
                 // Navigation Buttons
                 VStack(spacing: 4) {
-                    SidebarNavButton(icon: "square.grid.2x2.fill", title: "Mes Applications", isSelected: vm.activeTab == "apps") {
+                    SidebarNavButton(icon: "square.grid.2x2.fill", title: "Applications", isSelected: vm.activeTab == "apps") {
                         vm.activeTab = "apps"
                     }
                     SidebarNavButton(icon: "arrow.down.doc.fill", title: "Installer un APK", isSelected: vm.activeTab == "install") {
-                        vm.activeTab = "install"
-                    }
-                    SidebarNavButton(icon: "gearshape.2.fill", title: "Reconfigurer (Specs)", isSelected: vm.activeTab == "specs") {
-                        withAnimation(.spring()) {
-                            vm.isConfigured = false
-                        }
+                        selectAndInstallAPK()
                     }
                 }
                 .padding(.horizontal, 8)
@@ -100,7 +89,7 @@ struct DashboardContent: View {
                 
                 Spacer()
                 
-                // Bouton Start / Stop Fonctionnel
+                // Bouton Start / Stop
                 Button(action: {
                     vm.toggleVM()
                 }) {
@@ -112,7 +101,7 @@ struct DashboardContent: View {
                         } else {
                             Image(systemName: vm.isVMRunning ? "stop.fill" : "play.fill")
                         }
-                        Text(vm.isVMRunning ? "Arrêter MSA" : "Démarrer MSA")
+                        Text(vm.isVMRunning ? "Arrêter Android 16" : "Démarrer Android 16")
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
@@ -142,16 +131,15 @@ struct DashboardContent: View {
                     // Top Bar
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Sous-Système Android")
+                            Text("Sous-Système Android 16")
                                 .font(.system(size: 26, weight: .bold, design: .rounded))
-                            Text("Exécution native sans émulateur pour macOS Apple Silicon")
+                            Text("Image Officielle Google AOSP ARM64 (3,5 Go) avec Google Play")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
                         
                         Spacer()
                         
-                        // Action Ouvrir Fichier APK
                         Button(action: selectAndInstallAPK) {
                             Label("Ajouter un APK", systemImage: "plus.circle.fill")
                                 .font(.system(size: 13, weight: .semibold))
@@ -183,7 +171,7 @@ struct DashboardContent: View {
                                 .foregroundColor(.green)
                             Text("Glissez-déposez un fichier APK ici")
                                 .font(.system(size: 13, weight: .semibold))
-                            Text("Installation immédiate dans le sous-système Android")
+                            Text("Installation directe dans la partition userdata Android 16")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
@@ -206,10 +194,10 @@ struct DashboardContent: View {
                     // Applications Grid Réelles
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("Applications Prêtes")
+                            Text("Applications Android 16")
                                 .font(.system(size: 16, weight: .bold))
                             Spacer()
-                            Text("\(vm.installedApps.count) installée(s)")
+                            Text("\(vm.installedApps.count) disponible(s)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

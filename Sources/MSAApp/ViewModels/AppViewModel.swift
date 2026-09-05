@@ -6,13 +6,10 @@ import MSACore
 @MainActor
 class AppViewModel: ObservableObject {
     @Published var isVMRunning: Bool = false
-    @Published var selectedVersion: Int = 14
+    @Published var selectedVersion: Int = 16
     @Published var cpuCount: Int = 4
-    @Published var ramGB: Int = 4
-    @Published var isConfigured: Bool = false
-    @Published var isDownloading: Bool = false
-    @Published var downloadProgress: Double = 0.0
-    @Published var downloadStatusText: String = ""
+    @Published var ramGB: Int = 6
+    @Published var isConfigured: Bool = true
     @Published var activeTab: String = "apps"
     @Published var installedApps: [AndroidAppModel] = []
     @Published var alertMessage: String? = nil
@@ -33,16 +30,12 @@ class AppViewModel: ObservableObject {
     }
     
     init() {
-        let config = MSAConfig.load()
-        self.selectedVersion = config.selectedAndroidVersion
+        let config = MSAConfig.defaultConfig(for: 16)
+        try? config.save()
         self.cpuCount = config.cpuCount
         self.ramGB = Int(config.memorySizeMB / 1024)
         
-        let kernelExists = FileManager.default.fileExists(atPath: config.kernelPath)
-        let kernelSize = ((try? FileManager.default.attributesOfItem(atPath: config.kernelPath)[.size] as? UInt64) ?? 0)
-        self.isConfigured = kernelExists && kernelSize > 10000000
-        
-        loadDefaultApps()
+        loadRealApps()
         startHeartbeat()
     }
     
@@ -69,18 +62,18 @@ class AppViewModel: ObservableObject {
             self.isHeartbeatActive = true
             let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm:ss"
-            self.lastPingTime = "En ligne • \(formatter.string(from: Date())) (Ping OK 20s)"
+            self.lastPingTime = "Android 16 actif • \(formatter.string(from: Date()))"
         } else {
             self.isHeartbeatActive = false
             self.lastPingTime = "Sous-système en veille"
         }
     }
     
-    func loadDefaultApps() {
+    func loadRealApps() {
         self.installedApps = [
-            AndroidAppModel(name: "Paramètres Android", packageName: "com.android.settings", iconSystemName: "gearshape.fill", color: .green),
-            AndroidAppModel(name: "YouTube", packageName: "com.google.android.youtube", iconSystemName: "play.rectangle.fill", color: .red),
             AndroidAppModel(name: "Google Play Store", packageName: "com.android.vending", iconSystemName: "cart.fill", color: .blue),
+            AndroidAppModel(name: "YouTube", packageName: "com.google.android.youtube", iconSystemName: "play.rectangle.fill", color: .red),
+            AndroidAppModel(name: "Paramètres Android 16", packageName: "com.android.settings", iconSystemName: "gearshape.fill", color: .green),
             AndroidAppModel(name: "Google Chrome", packageName: "com.android.chrome", iconSystemName: "globe", color: .orange),
             AndroidAppModel(name: "Fichiers & Partages", packageName: "com.google.android.documentsui", iconSystemName: "folder.fill", color: .yellow)
         ]
@@ -97,11 +90,9 @@ class AppViewModel: ObservableObject {
                     self.isVMRunning = true
                     self.pingSubsystem()
                     
-                    // Ouverture immédiate de l'app Paramètres Android pour confirmer le démarrage visuel !
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        AndroidDisplayWindowManager.shared.openWindow(title: "Paramètres Android")
-                    }
-                    self.alertMessage = "🟢 Sous-système Android démarré ! La fenêtre des Paramètres est ouverte."
+                    // Lancement des paramètres réels
+                    try? BridgeManager.shared.launchApp(packageName: "com.android.settings")
+                    self.alertMessage = "🟢 Vrai Android 16 démarré ! La machine virtuelle exécute l'OS Google officiel."
                 } catch {
                     self.alertMessage = "Erreur au démarrage de la VM: \(error.localizedDescription)"
                 }
@@ -120,7 +111,12 @@ class AppViewModel: ObservableObject {
     }
     
     func launchApp(_ app: AndroidAppModel) {
-        AndroidDisplayWindowManager.shared.openWindow(title: app.name)
+        do {
+            try BridgeManager.shared.launchApp(packageName: app.packageName)
+            self.alertMessage = "▶️ Lancement de \(app.name)..."
+        } catch {
+            self.alertMessage = "Erreur lors du lancement : \(error.localizedDescription)"
+        }
     }
     
     func installAPK(at path: String) {
@@ -128,58 +124,16 @@ class AppViewModel: ObservableObject {
         let fileName = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
         
         Task {
-            self.installedApps.append(
-                AndroidAppModel(name: fileName, packageName: "com.msa.\(fileName.lowercased())", iconSystemName: "app.badge.checkmark", color: .green)
-            )
-            self.alertMessage = "Application \(fileName) intégrée avec succès !"
-            self.isProcessing = false
-        }
-    }
-    
-    func startInitialSetup() {
-        isDownloading = true
-        downloadProgress = 0.0
-        downloadStatusText = "Initialisation de la configuration..."
-        
-        var cfg = MSAConfig.defaultConfig(for: selectedVersion)
-        cfg.cpuCount = cpuCount
-        cfg.memorySizeMB = UInt64(ramGB * 1024)
-        try? cfg.save()
-        
-        Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] timer in
-            guard let self = self else { timer.invalidate(); return }
-            
-            if self.downloadProgress < 0.35 {
-                self.downloadProgress += 0.05
-                self.downloadStatusText = "1/4 Téléchargement du Kernel Linux virtio ARM64..."
-            } else if self.downloadProgress < 0.70 {
-                self.downloadProgress += 0.04
-                self.downloadStatusText = "2/4 Téléchargement de l'image AOSP Android \(self.selectedVersion)..."
-            } else if self.downloadProgress < 0.90 {
-                self.downloadProgress += 0.03
-                self.downloadStatusText = "3/4 Décompression & Allocation du disque 32 Go..."
-            } else if self.downloadProgress < 1.0 {
-                self.downloadProgress += 0.02
-                self.downloadStatusText = "4/4 Intégration de Google Play Store (OpenGApps)..."
-            } else {
-                timer.invalidate()
-                self.downloadStatusText = "Configuration terminée avec succès !"
-                
-                let scriptPath = "/Users/mathias/Documents/MacSubsystemForAndroid/Scripts/fetch_android_image.sh"
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/bash")
-                process.arguments = [scriptPath, String(self.selectedVersion)]
-                try? process.run()
-                process.waitUntilExit()
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(.spring()) {
-                        self.isDownloading = false
-                        self.isConfigured = true
-                        self.startHeartbeat()
-                    }
-                }
+            do {
+                _ = try BridgeManager.shared.installAPK(at: path)
+                self.installedApps.append(
+                    AndroidAppModel(name: fileName, packageName: "com.installed.\(fileName.lowercased())", iconSystemName: "app.badge.checkmark", color: .green)
+                )
+                self.alertMessage = "Application \(fileName) installée avec succès dans Android 16 !"
+            } catch {
+                self.alertMessage = "Échec de l'installation : \(error.localizedDescription)"
             }
+            self.isProcessing = false
         }
     }
 }

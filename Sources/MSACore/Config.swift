@@ -14,17 +14,17 @@ public struct MSAConfig: Codable {
     public var enableGApps: Bool
     public var vsockPort: UInt32
 
-    public static func defaultConfig(for version: Int = 13) -> MSAConfig {
+    public static func defaultConfig(for version: Int = 16) -> MSAConfig {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let msaHome = "\(home)/.msa"
-        let versionDir = "\(msaHome)/android-\(version)"
+        let versionDir = "\(msaHome)/android-16"
         return MSAConfig(
-            selectedAndroidVersion: version,
-            cpuCount: max(2, ProcessInfo.processInfo.processorCount / 2),
-            memorySizeMB: 4096,
+            selectedAndroidVersion: 16,
+            cpuCount: max(4, ProcessInfo.processInfo.activeProcessorCount / 2),
+            memorySizeMB: 6144,
             diskSizeGB: 32,
-            kernelPath: "\(versionDir)/vmlinux-arm64",
-            initrdPath: "\(versionDir)/initrd.img",
+            kernelPath: "\(versionDir)/vmlinux-ranchu",
+            initrdPath: "\(versionDir)/ramdisk.img",
             diskImagePath: "\(versionDir)/userdata.img",
             systemImagePath: "\(versionDir)/system.img",
             dataDirectory: versionDir,
