@@ -11,7 +11,8 @@ func printUsage() {
     Usage: msa <command> [options]
     
     Commands:
-      setup              Interactive Android version selector (Android 6 to 17) & image downloader
+      setup              Interactive Android version selector (Android 6 to 17)
+      download           Download & prepare AOSP images for the selected version
       start              Start the Android microVM daemon
       stop               Stop the Android microVM
       status             Show current subsystem status & selected Android version
@@ -54,22 +55,40 @@ case "setup":
     }
     
     print("\n⚙️ Configuration de l'environnement pour Android \(selectedVersion.rawValue) (\(selectedVersion.codename))...")
-    var config = MSAConfig.defaultConfig(for: selectedVersion.rawValue)
+    let config = MSAConfig.defaultConfig(for: selectedVersion.rawValue)
     
     do {
         try config.save()
         print("✅ Configuration sauvegardée dans ~/.msa/config.json")
         print("📁 Dossier système : \(config.dataDirectory)")
         print("\n🎉 Android \(selectedVersion.rawValue) est désormais sélectionné comme système actif pour MSA.")
+        print("👉 Tapez 'msa download' pour récupérer les images système correspondantes.")
         print("👉 Tapez 'msa start' pour démarrer le sous-système.")
     } catch {
         print("❌ Erreur lors de la sauvegarde de la configuration : \(error)")
         exit(1)
     }
 
+case "download":
+    let currentConfig = MSAConfig.load()
+    let scriptPath = "/Users/mathias/Documents/MacSubsystemForAndroid/Scripts/fetch_android_image.sh"
+    print("📥 Lancement du téléchargement des composants pour Android \(currentConfig.selectedAndroidVersion)...")
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/bash")
+    process.arguments = [scriptPath, String(currentConfig.selectedAndroidVersion)]
+    try? process.run()
+    process.waitUntilExit()
+
 case "start":
     let currentConfig = MSAConfig.load()
     print("🚀 Initialisation du sous-système Android \(currentConfig.selectedAndroidVersion) (Virtualization.framework)...")
+    
+    guard FileManager.default.fileExists(atPath: currentConfig.kernelPath) else {
+        print("❌ Le kernel pour Android \(currentConfig.selectedAndroidVersion) est manquant dans \(currentConfig.kernelPath).")
+        print("👉 Exécutez 'msa download' pour initialiser les images de cette version.")
+        exit(1)
+    }
+    
     Task {
         do {
             try await VMManager.shared.start()
@@ -77,7 +96,6 @@ case "start":
             dispatchMain()
         } catch {
             print("❌ Erreur au démarrage du sous-système: \(error.localizedDescription)")
-            print("💡 Assurez-vous d'avoir exécuté 'msa setup' pour préparer l'environnement.")
             exit(1)
         }
     }
@@ -97,7 +115,7 @@ case "status":
     if BridgeManager.shared.isConnected() {
         print("• Connexion ADB          : 🟢 En ligne & Connecté")
     } else {
-        print("• Connexion ADB          : ⚪ En attente ou VM arrêtée")
+        print("• Connexion ADB          : ⚪ VM en attente de démarrage ('msa start')")
     }
 
 case "list":

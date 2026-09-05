@@ -31,7 +31,17 @@ public class BridgeManager {
     
     public func isConnected() -> Bool {
         guard let output = try? executeADB(args: ["devices"]) else { return false }
-        return output.contains("device") && !output.contains("offline")
+        let lines = output.components(separatedBy: "\n").filter { !$0.isEmpty }
+        // Look for our specific MSA port or valid attached Android device
+        for line in lines {
+            if (line.contains("127.0.0.1:5555") || line.contains("emulator-") || line.contains("device")) && !line.contains("List of") {
+                // Verify it's Android by checking for getprop or pm
+                if let test = try? executeADB(args: ["shell", "which", "pm"]), test.contains("pm") {
+                    return true
+                }
+            }
+        }
+        return false
     }
     
     public func listInstalledApps() throws -> [String] {
