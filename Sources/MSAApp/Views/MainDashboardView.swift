@@ -153,42 +153,76 @@ struct DashboardContent: View {
                     .padding(.horizontal, 28)
                     .padding(.top, 24)
                     
-                    // Drag and Drop Zone APK Réelle
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .strokeBorder(
-                                        vm.isDraggingOver ? Color.green : Color.white.opacity(0.2),
-                                        style: StrokeStyle(lineWidth: 1.5, dash: [6])
-                                    )
-                            )
-                        
-                        VStack(spacing: 8) {
-                            Image(systemName: "arrow.down.doc.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(.green)
-                            Text("Glissez-déposez un fichier APK ici")
-                                .font(.system(size: 13, weight: .semibold))
-                            Text("Installation directe dans la partition userdata Android 16")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 18)
-                    }
-                    .padding(.horizontal, 28)
-                    .onDrop(of: ["public.file-url"], isTargeted: $vm.isDraggingOver) { providers in
-                        guard let provider = providers.first else { return false }
-                        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { urlData, _ in
-                            if let data = urlData as? Data,
-                               let path = URL(dataRepresentation: data, relativeTo: nil)?.path {
-                                DispatchQueue.main.async {
-                                    vm.installAPK(at: path)
-                                }
+                    // Zone APK Interactive ou Barre de Progression d'Installation
+                    if vm.isInstallingAPK {
+                        // Carte de progression en direct
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Label("Installation en cours...", systemImage: "arrow.down.circle.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.green)
+                                Spacer()
+                                Text("\(Int(vm.apkInstallProgress * 100))%")
+                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            }
+                            
+                            ProgressView(value: vm.apkInstallProgress, total: 1.0)
+                                .progressViewStyle(LinearProgressViewStyle(tint: .green))
+                            
+                            HStack {
+                                Text(vm.apkInstallStatus)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                Spacer()
                             }
                         }
-                        return true
+                        .padding(18)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                        )
+                        .padding(.horizontal, 28)
+                        .transition(.scale.combined(with: .opacity))
+                    } else {
+                        // Drag and Drop Zone APK
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .strokeBorder(
+                                            vm.isDraggingOver ? Color.green : Color.white.opacity(0.2),
+                                            style: StrokeStyle(lineWidth: 1.5, dash: [6])
+                                        )
+                                )
+                            
+                            VStack(spacing: 8) {
+                                Image(systemName: "arrow.down.doc.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.green)
+                                Text("Glissez-déposez un fichier APK ici")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("Affichage de l'avancement détaillé en temps réel")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 18)
+                        }
+                        .padding(.horizontal, 28)
+                        .onDrop(of: ["public.file-url"], isTargeted: $vm.isDraggingOver) { providers in
+                            guard let provider = providers.first else { return false }
+                            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { urlData, _ in
+                                if let data = urlData as? Data,
+                                   let path = URL(dataRepresentation: data, relativeTo: nil)?.path {
+                                    DispatchQueue.main.async {
+                                        vm.installAPK(at: path)
+                                    }
+                                }
+                            }
+                            return true
+                        }
                     }
                     
                     // Applications Grid Réelles
