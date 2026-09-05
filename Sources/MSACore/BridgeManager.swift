@@ -100,6 +100,7 @@ public class BridgeManager {
             "--max-fps", "\(maxFps)",          // FPS configurable (30, 60, 90, 120 ProMotion, 144)
             "--new-display=\(displaySize)",
             "--flex-display",                 // Plein écran auto-adaptatif sans bande noire
+            "--mouse-bind=++++:++++",          // Verrouillage Sandbox : empêche le clic droit/molette de déclencher HOME ou Retour Système
             "--no-audio"
         ]
         
