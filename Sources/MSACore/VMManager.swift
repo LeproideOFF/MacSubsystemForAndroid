@@ -63,18 +63,8 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
             bootLoader.initialRamdiskURL = URL(fileURLWithPath: config.initrdPath)
         }
         
-        bootLoader.commandLine = "console=hvc0 console=tty0 earlycon=uart8250,mmio32,0x09000000 root=/dev/vda rw androidboot.hardware=ranchu androidboot.selinux=permissive androidboot.freeform_window_management=1 init=/init"
+        bootLoader.commandLine = "console=tty0 root=/dev/vda rw androidboot.hardware=ranchu androidboot.selinux=permissive androidboot.freeform_window_management=1 init=/init"
         vzConfig.bootLoader = bootLoader
-        
-        // 3. Serial Console (Captures du noyau Linux vers Pipe)
-        let serial = VZVirtioConsoleDeviceSerialPortConfiguration()
-        let serialPipe = Pipe()
-        let serialPortAttachment = VZFileHandleSerialPortAttachment(
-            fileHandleForReading: FileHandle.nullDevice,
-            fileHandleForWriting: serialPipe.fileHandleForWriting
-        )
-        serial.attachment = serialPortAttachment
-        vzConfig.serialPorts = [serial]
         
         // 4. Block Devices (Vraie partition Google AOSP 3.5 Go + Userdata 32 Go)
         var storageDevices: [VZStorageDeviceConfiguration] = []
