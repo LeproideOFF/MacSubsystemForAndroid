@@ -141,12 +141,8 @@ case "launch":
     }
     let package = args[2]
     print("▶️ Lancement de \(package)...")
-    do {
-        try BridgeManager.shared.launchApp(packageName: package)
-        print("✅ Application lancée avec fenêtre macOS.")
-    } catch {
-        print("❌ Échec du lancement: \(error)")
-    }
+    BridgeManager.shared.launchAppWindow(packageName: package, title: package)
+    print("✅ Fenêtre native macOS ouverte pour \(package).")
 
 case "wrap":
     guard args.count > 3 else {
