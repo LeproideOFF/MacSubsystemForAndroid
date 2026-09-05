@@ -73,7 +73,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         serial.attachment = serialPortAttachment
         vzConfig.serialPorts = [serial]
         
-        // 4. Block Devices (Disque racine Android + Userdata 32 Go)
+        // 4. Block Devices
         var storageDevices: [VZStorageDeviceConfiguration] = []
         let fm = FileManager.default
         
@@ -117,19 +117,23 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         state = .starting
         
         let vzConfig = try createConfiguration()
-        let vm = VZVirtualMachine(configuration: vzConfig)
-        vm.delegate = self
-        self.virtualMachine = vm
         
+        // CRITICAL FIX: Apple Virtualization.framework requires VZVirtualMachine to be allocated and started on DispatchQueue.main!
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            vm.start { result in
-                switch result {
-                case .success:
-                    self.state = .running
-                    continuation.resume()
-                case .failure(let error):
-                    self.state = .error(error.localizedDescription)
-                    continuation.resume(throwing: error)
+            DispatchQueue.main.async {
+                let vm = VZVirtualMachine(configuration: vzConfig, queue: .main)
+                vm.delegate = self
+                self.virtualMachine = vm
+                
+                vm.start { result in
+                    switch result {
+                    case .success:
+                        self.state = .running
+                        continuation.resume()
+                    case .failure(let error):
+                        self.state = .error(error.localizedDescription)
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
         }
@@ -138,15 +142,31 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
     public func stop() async throws {
         guard let vm = virtualMachine, case .running = state else { return }
         state = .pausing
-        try await vm.stop()
-        state = .stopped
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.main.async {
+                vm.stop { error in
+                    if let error = error {
+                        self.state = .error(error.localizedDescription)
+                        continuation.resume(throwing: error)
+                    } else {
+                        self.state = .stopped
+                        continuation.resume()
+                    }
+                }
+            }
+        }
     }
     
     public func guestDidStop(_ virtualMachine: VZVirtualMachine) {
-        state = .stopped
+        DispatchQueue.main.async {
+            self.state = .stopped
+        }
     }
     
     public func virtualMachine(_ virtualMachine: VZVirtualMachine, didStopWithError error: Error) {
-        state = .error(error.localizedDescription)
+        DispatchQueue.main.async {
+            self.state = .error(error.localizedDescription)
+        }
     }
 }
