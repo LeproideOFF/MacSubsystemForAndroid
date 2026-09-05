@@ -42,7 +42,12 @@ public class BridgeManager {
     
     public func isConnected() -> Bool {
         guard let output = try? executeADB(args: ["devices"]) else { return false }
-        return output.contains("emulator-5554\tdevice") || (output.contains("device") && !output.contains("offline"))
+        for line in output.components(separatedBy: "\n") {
+            if line.contains("emulator-5554") && line.contains("device") && !line.contains("offline") {
+                return true
+            }
+        }
+        return false
     }
     
     public func listInstalledApps() throws -> [String] {
@@ -61,12 +66,18 @@ public class BridgeManager {
     }
     
     public func stopSubsystem() {
-        // Arrête proprement QEMU, l'émulateur et toutes les fenêtres scrcpy
-        let pkill = Process()
-        pkill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        pkill.arguments = ["-9", "-f", "qemu-system-aarch64|emulator|scrcpy"]
-        try? pkill.run()
-        pkill.waitUntilExit()
+        // Envoie la commande d'arrêt officiel à l'émulateur
+        _ = try? executeADB(args: ["emu", "kill"])
+        
+        // Termine instantanément tous les processus liés
+        let names = ["qemu-system-aarch64", "emulator", "crashpad_handler", "scrcpy"]
+        for name in names {
+            let killProc = Process()
+            killProc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+            killProc.arguments = ["-9", name]
+            try? killProc.run()
+            killProc.waitUntilExit()
+        }
     }
     
     public func launchAppWindow(packageName: String, title: String, isTablet: Bool = true) {
