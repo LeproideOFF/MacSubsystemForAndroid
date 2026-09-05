@@ -63,15 +63,14 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
             bootLoader.initialRamdiskURL = URL(fileURLWithPath: config.initrdPath)
         }
         
-        bootLoader.commandLine = "console=hvc0 root=/dev/vda rw androidboot.hardware=ranchu androidboot.selinux=permissive androidboot.freeform_window_management=1 init=/init quiet loglevel=3"
+        bootLoader.commandLine = "console=hvc0 console=tty0 earlycon=uart8250,mmio32,0x09000000 root=/dev/vda rw androidboot.hardware=ranchu androidboot.selinux=permissive androidboot.freeform_window_management=1 init=/init"
         vzConfig.bootLoader = bootLoader
         
         // 3. Serial Console
         let serial = VZVirtioConsoleDeviceSerialPortConfiguration()
-        let stdioPipe = Pipe()
         let serialPortAttachment = VZFileHandleSerialPortAttachment(
-            fileHandleForReading: FileHandle.standardInput,
-            fileHandleForWriting: stdioPipe.fileHandleForWriting
+            fileHandleForReading: FileHandle.nullDevice,
+            fileHandleForWriting: FileHandle.standardError
         )
         serial.attachment = serialPortAttachment
         vzConfig.serialPorts = [serial]
@@ -146,6 +145,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
                         NativeAndroidWindowController.shared.attachAndShow(vm: vm, title: "Android 16 • Bare Metal (Metal Graphics)")
                         continuation.resume()
                     case .failure(let error):
+                        print("❌ [VMManager] VZVirtualMachine.start FAILED: \(error)")
                         self.state = .error(error.localizedDescription)
                         continuation.resume(throwing: error)
                     }

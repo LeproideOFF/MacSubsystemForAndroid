@@ -86,6 +86,9 @@ struct DashboardContent: View {
                     SidebarNavButton(icon: "cpu.fill", title: "Performances & Éco", isSelected: vm.activeTab == "perf") {
                         vm.activeTab = "perf"
                     }
+                    SidebarNavButton(icon: "terminal.fill", title: "Console & Logs", isSelected: vm.activeTab == "logs") {
+                        vm.activeTab = "logs"
+                    }
                     SidebarNavButton(icon: "arrow.down.doc.fill", title: "Installer un APK", isSelected: false) {
                         selectAndInstallAPK()
                     }
@@ -95,7 +98,34 @@ struct DashboardContent: View {
                 
                 Spacer()
                 
-                // Bouton Start / Stop
+                // Bouton Installer Android 16
+                Button(action: {
+                    vm.installAndroidSubsystem()
+                }) {
+                    HStack {
+                        if vm.isInstallingSubsystem {
+                            ProgressView()
+                                .controlSize(.small)
+                                .colorInvert()
+                        } else {
+                            Image(systemName: "arrow.down.circle.fill")
+                        }
+                        Text(vm.isInstallingSubsystem ? "Configuration..." : "Installer Android 16")
+                            .fontWeight(.medium)
+                            .font(.system(size: 12))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.blue.opacity(0.85))
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
+                .disabled(vm.isInstallingSubsystem)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+                
+                // Bouton Start / Stop Bare Metal
                 Button(action: {
                     vm.toggleVM()
                 }) {
@@ -119,7 +149,8 @@ struct DashboardContent: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(vm.isProcessing)
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
             }
             .frame(minWidth: 230, maxWidth: 250)
             .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
@@ -199,6 +230,8 @@ struct DashboardContent: View {
                         DeviceCustomizationView(vm: vm)
                     } else if vm.activeTab == "perf" {
                         PerformanceTabView(vm: vm)
+                    } else if vm.activeTab == "logs" {
+                        AndroidLogsTabView(vm: vm)
                     }
                 }
             }
@@ -654,5 +687,71 @@ struct RealAppCardView: View {
         .background(.ultraThinMaterial)
         .cornerRadius(14)
         .shadow(color: .black.opacity(0.04), radius: 8, y: 4)
+    }
+}
+
+struct AndroidLogsTabView: View {
+    @ObservedObject var vm: AppViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Journal & Console Android 16 en Direct")
+                        .font(.system(size: 18, weight: .bold))
+                    Text("Nettoyage automatique permanent (tampon 300 lignes max) • Zéro lag")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                
+                Button(action: {
+                    vm.clearLogs()
+                }) {
+                    Label("Effacer", systemImage: "trash")
+                        .font(.system(size: 12))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial)
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 4)
+            
+            // Terminal Log Viewer
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(vm.androidLogs.enumerated()), id: \.offset) { index, logLine in
+                            Text(logLine)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(
+                                    logLine.contains("❌") ? .red :
+                                    (logLine.contains("✅") ? .green :
+                                    (logLine.contains("🚀") ? .blue : .white.opacity(0.85)))
+                                )
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .id(index)
+                        }
+                    }
+                    .padding(14)
+                }
+                .background(Color.black.opacity(0.65))
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+                .padding(.horizontal, 28)
+                .padding(.bottom, 24)
+                .onChange(of: vm.androidLogs.count) { _ in
+                    if let lastIndex = vm.androidLogs.indices.last {
+                        proxy.scrollTo(lastIndex, anchor: .bottom)
+                    }
+                }
+            }
+        }
     }
 }

@@ -57,20 +57,10 @@ public class BridgeManager {
             .map { $0.replacingOccurrences(of: "package:", with: "").trimmingCharacters(in: .whitespacesAndNewlines) }
     }
     
-    public func launchDesktopGUI() {
-        let script = "/Users/mathias/Documents/MacSubsystemForAndroid/Scripts/launch_android16_gui.sh"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [script]
-        try? process.run()
-    }
-    
     public func stopSubsystem() {
-        // Envoie la commande d'arrêt officiel à l'émulateur
         _ = try? executeADB(args: ["emu", "kill"])
         
-        // Termine instantanément tous les processus liés
-        let names = ["qemu-system-aarch64", "emulator", "crashpad_handler", "scrcpy"]
+        let names = ["scrcpy"]
         for name in names {
             let killProc = Process()
             killProc.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
@@ -109,9 +99,7 @@ public class BridgeManager {
     }
     
     public func ensureRunning() {
-        if !isConnected() {
-            launchDesktopGUI()
-        }
+        // Le sous-système est géré par la Virtualisation Bare Metal Apple
     }
     
     public func setDisplayResolution(width: Int, height: Int, density: Int) {
