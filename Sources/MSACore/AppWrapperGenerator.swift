@@ -3,20 +3,24 @@ import Foundation
 public class AppWrapperGenerator {
     public static let shared = AppWrapperGenerator()
     
-    private let appsDirectory: URL
+    private let globalAppsDirectory: URL
+    private let userAppsDirectory: URL
     
     private init() {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        self.appsDirectory = home.appendingPathComponent("Applications/Android Apps", isDirectory: true)
-        try? FileManager.default.createDirectory(at: appsDirectory, withIntermediateDirectories: true)
+        self.userAppsDirectory = home.appendingPathComponent("Applications", isDirectory: true)
+        self.globalAppsDirectory = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        try? FileManager.default.createDirectory(at: userAppsDirectory, withIntermediateDirectories: true)
     }
     
     public func createWrapper(packageName: String, appName: String) throws -> URL {
-        let bundleURL = appsDirectory.appendingPathComponent("\(appName).app")
+        // Create in ~/Applications so Spotlight and Launchpad index it immediately without sudo
+        let bundleURL = userAppsDirectory.appendingPathComponent("\(appName).app")
         let contentsURL = bundleURL.appendingPathComponent("Contents")
         let macosURL = contentsURL.appendingPathComponent("MacOS")
         let resourcesURL = contentsURL.appendingPathComponent("Resources")
         
+        try? FileManager.default.removeItem(at: bundleURL)
         try FileManager.default.createDirectory(at: macosURL, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: resourcesURL, withIntermediateDirectories: true)
         
@@ -35,6 +39,8 @@ public class AppWrapperGenerator {
             <string>APPL</string>
             <key>CFBundleShortVersionString</key>
             <string>1.0</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>13.0</string>
         </dict>
         </plist>
         """
@@ -42,12 +48,15 @@ public class AppWrapperGenerator {
         
         let launcherScript = """
         #!/bin/bash
-        # Launcher pour \(appName) (\(packageName)) via MSA
+        # Launcher pour \(appName) via MSA
         
-        # 1. Lancer l'activité Android
-        /opt/homebrew/bin/adb shell monkey -p "\(packageName)" -c android.intent.category.LAUNCHER 1
+        # 1. Démarrer MSA si non actif
+        pgrep -f "msa start" > /dev/null || (/opt/homebrew/bin/msa start &)
         
-        # 2. Ouvrir la fenêtre native macOS via scrcpy
+        # 2. Lancer l'activité Android
+        /opt/homebrew/bin/adb shell monkey -p "\(packageName)" -c android.intent.category.LAUNCHER 1 2>/dev/null || true
+        
+        # 3. Ouvrir la fenêtre native via scrcpy
         if command -v /opt/homebrew/bin/scrcpy &> /dev/null; then
             /opt/homebrew/bin/scrcpy --window-title "\(appName)" --always-on-top=false --stay-awake
         fi

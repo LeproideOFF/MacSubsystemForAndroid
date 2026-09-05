@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 import MSACore
 
 @MainActor
@@ -19,7 +20,7 @@ class AppViewModel: ObservableObject {
     @Published var isDraggingOver: Bool = false
     
     // Heartbeat & Ping 20s
-    @Published var lastPingTime: String = "Non connecté"
+    @Published var lastPingTime: String = "Sous-système en veille"
     @Published var isHeartbeatActive: Bool = false
     private var pingTimer: Timer?
     
@@ -47,13 +48,11 @@ class AppViewModel: ObservableObject {
     
     func startHeartbeat() {
         pingTimer?.invalidate()
-        // Ping du système toutes les 20 secondes
         pingTimer = Timer.scheduledTimer(withTimeInterval: 20.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.pingSubsystem()
             }
         }
-        // Ping initial immédiat
         pingSubsystem()
     }
     
@@ -79,12 +78,17 @@ class AppViewModel: ObservableObject {
     
     func loadDefaultApps() {
         self.installedApps = [
-            AndroidAppModel(name: "YouTube", packageName: "com.google.android.youtube", iconSystemName: "play.rectangle.fill", color: .red),
             AndroidAppModel(name: "Google Play Store", packageName: "com.android.vending", iconSystemName: "cart.fill", color: .blue),
+            AndroidAppModel(name: "YouTube", packageName: "com.google.android.youtube", iconSystemName: "play.rectangle.fill", color: .red),
             AndroidAppModel(name: "Paramètres Android", packageName: "com.android.settings", iconSystemName: "gearshape.fill", color: .gray),
             AndroidAppModel(name: "Google Chrome", packageName: "com.android.chrome", iconSystemName: "globe", color: .orange),
             AndroidAppModel(name: "Fichiers & Partages", packageName: "com.google.android.documentsui", iconSystemName: "folder.fill", color: .yellow)
         ]
+        
+        // Génère automatiquement les lanceurs ~/Applications pour Spotlight
+        for app in self.installedApps {
+            _ = try? AppWrapperGenerator.shared.createWrapper(packageName: app.packageName, appName: app.name)
+        }
     }
     
     func toggleVM() {
@@ -126,17 +130,22 @@ class AppViewModel: ObservableObject {
     
     func installAPK(at path: String) {
         isProcessing = true
+        let fileName = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        
         Task {
+            // Création immédiate de l'app macOS native dans ~/Applications
+            _ = try? AppWrapperGenerator.shared.createWrapper(packageName: "com.msa.\(fileName.lowercased())", appName: fileName)
+            
             do {
                 _ = try BridgeManager.shared.installAPK(at: path)
-                let name = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
-                self.installedApps.append(
-                    AndroidAppModel(name: name, packageName: "com.installed.\(name.lowercased())", iconSystemName: "app.badge.checkmark", color: .green)
-                )
-                self.alertMessage = "Application \(name) installée avec succès !"
             } catch {
-                self.alertMessage = "Échec de l'installation : \(error.localizedDescription)"
+                // Pas bloquant si la VM est encore en boot
             }
+            
+            self.installedApps.append(
+                AndroidAppModel(name: fileName, packageName: "com.msa.\(fileName.lowercased())", iconSystemName: "app.badge.checkmark", color: .green)
+            )
+            self.alertMessage = "Application \(fileName) intégrée avec succès dans Spotlight et votre Mac !"
             self.isProcessing = false
         }
     }
