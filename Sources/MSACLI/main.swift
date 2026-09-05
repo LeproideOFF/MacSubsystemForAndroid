@@ -11,8 +11,7 @@ func printUsage() {
     Usage: msa <command> [options]
     
     Commands:
-      setup              Interactive Android version selector (Android 6 to 17)
-      download           Download & prepare AOSP images for the selected version
+      setup              Interactive Android version selector (Android 6 to 17) & auto-download
       start              Start the Android microVM daemon
       stop               Stop the Android microVM
       status             Show current subsystem status & selected Android version
@@ -35,7 +34,7 @@ case "setup":
     print("\n═════════════════════════════════════════════════════════")
     print("🤖 Mac Subsystem for Android (MSA) - Sélection de version")
     print("═════════════════════════════════════════════════════════")
-    print("Choisissez la version d'Android à exécuter sur votre Mac:\n")
+    print("Choisissez la version d'Android à installer sur votre Mac:\n")
     
     for version in AndroidVersion.allCases {
         let numStr = String(format: "%2d", version.rawValue)
@@ -60,35 +59,26 @@ case "setup":
     do {
         try config.save()
         print("✅ Configuration sauvegardée dans ~/.msa/config.json")
-        print("📁 Dossier système : \(config.dataDirectory)")
-        print("\n🎉 Android \(selectedVersion.rawValue) est désormais sélectionné comme système actif pour MSA.")
-        print("👉 Tapez 'msa download' pour récupérer les images système correspondantes.")
-        print("👉 Tapez 'msa start' pour démarrer le sous-système.")
+        print("📁 Dossier système : \(config.dataDirectory)\n")
+        
+        // Téléchargement et préparation automatique
+        let scriptPath = "/Users/mathias/Documents/MacSubsystemForAndroid/Scripts/fetch_android_image.sh"
+        if FileManager.default.fileExists(atPath: scriptPath) {
+            print("🚀 Début du téléchargement et de la configuration automatique de tous les composants...\n")
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.arguments = [scriptPath, String(selectedVersion.rawValue)]
+            try? process.run()
+            process.waitUntilExit()
+        }
     } catch {
-        print("❌ Erreur lors de la sauvegarde de la configuration : \(error)")
+        print("❌ Erreur lors de la configuration : \(error)")
         exit(1)
     }
-
-case "download":
-    let currentConfig = MSAConfig.load()
-    let scriptPath = "/Users/mathias/Documents/MacSubsystemForAndroid/Scripts/fetch_android_image.sh"
-    print("📥 Lancement du téléchargement des composants pour Android \(currentConfig.selectedAndroidVersion)...")
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/bash")
-    process.arguments = [scriptPath, String(currentConfig.selectedAndroidVersion)]
-    try? process.run()
-    process.waitUntilExit()
 
 case "start":
     let currentConfig = MSAConfig.load()
     print("🚀 Initialisation du sous-système Android \(currentConfig.selectedAndroidVersion) (Virtualization.framework)...")
-    
-    guard FileManager.default.fileExists(atPath: currentConfig.kernelPath) else {
-        print("❌ Le kernel pour Android \(currentConfig.selectedAndroidVersion) est manquant dans \(currentConfig.kernelPath).")
-        print("👉 Exécutez 'msa download' pour initialiser les images de cette version.")
-        exit(1)
-    }
-    
     Task {
         do {
             try await VMManager.shared.start()

@@ -31,8 +31,25 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         super.init()
     }
     
+    public func validateFiles() throws {
+        let config = MSAConfig.load()
+        let fm = FileManager.default
+        
+        guard fm.fileExists(atPath: config.kernelPath) else {
+            throw NSError(domain: "MSA", code: 1, userInfo: [NSLocalizedDescriptionKey: "Kernel manquant à : \(config.kernelPath)"])
+        }
+        
+        let kernelAttrs = try fm.attributesOfItem(atPath: config.kernelPath)
+        let kernelSize = (kernelAttrs[.size] as? UInt64) ?? 0
+        if kernelSize == 0 {
+            throw NSError(domain: "MSA", code: 2, userInfo: [NSLocalizedDescriptionKey: "Le fichier kernel est vide (0 octets) : \(config.kernelPath). Veuillez télécharger une image kernel ARM64 valide."])
+        }
+    }
+    
     public func createConfiguration() throws -> VZVirtualMachineConfiguration {
+        try validateFiles()
         let vzConfig = VZVirtualMachineConfiguration()
+        let config = MSAConfig.load()
         
         // 1. CPU & Memory
         vzConfig.cpuCount = min(config.cpuCount, VZVirtualMachineConfiguration.maximumAllowedCPUCount)
@@ -42,11 +59,14 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         
         // 2. Linux / Android Bootloader
         let bootLoader = VZLinuxBootLoader(kernelURL: URL(fileURLWithPath: config.kernelPath))
-        if FileManager.default.fileExists(atPath: config.initrdPath) {
-            bootLoader.initialRamdiskURL = URL(fileURLWithPath: config.initrdPath)
+        let fm = FileManager.default
+        if fm.fileExists(atPath: config.initrdPath) {
+            let initrdSize = ((try? fm.attributesOfItem(atPath: config.initrdPath)[.size] as? UInt64) ?? 0)
+            if initrdSize > 0 {
+                bootLoader.initialRamdiskURL = URL(fileURLWithPath: config.initrdPath)
+            }
         }
         
-        // Kernel command line for Android AOSP ARM64
         bootLoader.commandLine = [
             "console=hvc0",
             "root=/dev/vda",
@@ -59,7 +79,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         ].joined(separator: " ")
         vzConfig.bootLoader = bootLoader
         
-        // 3. Serial Console (HVC0)
+        // 3. Serial Console
         let serial = VZVirtioConsoleDeviceSerialPortConfiguration()
         let stdioPipe = Pipe()
         let serialPortAttachment = VZFileHandleSerialPortAttachment(
@@ -69,21 +89,22 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         serial.attachment = serialPortAttachment
         vzConfig.serialPorts = [serial]
         
-        // 4. Block Devices (Disks)
+        // 4. Storage Devices
         var storageDevices: [VZStorageDeviceConfiguration] = []
         
-        // System Image (Read-Only)
-        if FileManager.default.fileExists(atPath: config.systemImagePath) {
-            let systemAttachment = try VZDiskImageStorageDeviceAttachment(
-                url: URL(fileURLWithPath: config.systemImagePath),
-                readOnly: true
-            )
-            let systemBlock = VZVirtioBlockDeviceConfiguration(attachment: systemAttachment)
-            storageDevices.append(systemBlock)
+        if fm.fileExists(atPath: config.systemImagePath) {
+            let sysSize = ((try? fm.attributesOfItem(atPath: config.systemImagePath)[.size] as? UInt64) ?? 0)
+            if sysSize > 0 {
+                let systemAttachment = try VZDiskImageStorageDeviceAttachment(
+                    url: URL(fileURLWithPath: config.systemImagePath),
+                    readOnly: true
+                )
+                let systemBlock = VZVirtioBlockDeviceConfiguration(attachment: systemAttachment)
+                storageDevices.append(systemBlock)
+            }
         }
         
-        // Userdata Image (Read-Write)
-        if FileManager.default.fileExists(atPath: config.diskImagePath) {
+        if fm.fileExists(atPath: config.diskImagePath) {
             let dataAttachment = try VZDiskImageStorageDeviceAttachment(
                 url: URL(fileURLWithPath: config.diskImagePath),
                 readOnly: false
@@ -98,14 +119,13 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         networkDevice.attachment = VZNATNetworkDeviceAttachment()
         vzConfig.networkDevices = [networkDevice]
         
-        // 6. Sockets (Virtio Vsock for ultra-fast host <-> guest IPC)
+        // 6. Sockets (Virtio Vsock)
         let socketDevice = VZVirtioSocketDeviceConfiguration()
         vzConfig.socketDevices = [socketDevice]
         
-        // 7. Entropy (Virtio RNG)
+        // 7. Entropy
         vzConfig.entropyDevices = [VZVirtioEntropyDeviceConfiguration()]
         
-        // Validate
         try vzConfig.validate()
         return vzConfig
     }
@@ -129,7 +149,6 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         state = .stopped
     }
     
-    // MARK: - VZVirtualMachineDelegate
     public func guestDidStop(_ virtualMachine: VZVirtualMachine) {
         state = .stopped
     }
