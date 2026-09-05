@@ -26,18 +26,18 @@ struct DashboardContent: View {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(LinearGradient(colors: [.green, .teal], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .fill(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
                             .frame(width: 44, height: 44)
-                            .shadow(color: .green.opacity(0.3), radius: 8, x: 0, y: 4)
-                        Image(systemName: "candybarphone")
-                            .font(.system(size: 22, weight: .semibold))
+                            .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                        Image(systemName: "ipad.landscape")
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(.white)
                     }
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Android 16 Subsystem")
                             .font(.system(size: 14, weight: .bold))
-                        Text("Google AOSP ARM64")
+                        Text("Format Tablette • ARM64")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
@@ -75,17 +75,23 @@ struct DashboardContent: View {
                 .cornerRadius(10)
                 .padding(.horizontal, 16)
                 
-                // Navigation Buttons
+                // Navigation Buttons (Applications, Personnalisation Appareil, Performances & Thermique)
                 VStack(spacing: 4) {
                     SidebarNavButton(icon: "square.grid.2x2.fill", title: "Applications", isSelected: vm.activeTab == "apps") {
                         vm.activeTab = "apps"
                     }
-                    SidebarNavButton(icon: "arrow.down.doc.fill", title: "Installer un APK", isSelected: vm.activeTab == "install") {
+                    SidebarNavButton(icon: "iphone.and.arrow.forward", title: "Format & Appareil", isSelected: vm.activeTab == "device") {
+                        vm.activeTab = "device"
+                    }
+                    SidebarNavButton(icon: "cpu.fill", title: "Performances & Éco", isSelected: vm.activeTab == "perf") {
+                        vm.activeTab = "perf"
+                    }
+                    SidebarNavButton(icon: "arrow.down.doc.fill", title: "Installer un APK", isSelected: false) {
                         selectAndInstallAPK()
                     }
                 }
                 .padding(.horizontal, 8)
-                .padding(.top, 10)
+                .padding(.top, 6)
                 
                 Spacer()
                 
@@ -115,7 +121,7 @@ struct DashboardContent: View {
                 .disabled(vm.isProcessing)
                 .padding(16)
             }
-            .frame(minWidth: 220, maxWidth: 240)
+            .frame(minWidth: 230, maxWidth: 250)
             .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
         } detail: {
             // Main Content Area Liquid Glass
@@ -127,13 +133,13 @@ struct DashboardContent: View {
                     endRadius: 500
                 )
                 
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 18) {
                     // Top Bar
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Sous-Système Android 16")
                                 .font(.system(size: 26, weight: .bold, design: .rounded))
-                            Text("Image Officielle Google AOSP ARM64 (3,5 Go) avec Google Play")
+                            Text("Apple Silicon ARM64 • Fenêtres Natives Découplées & Écran d'Accueil")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -155,7 +161,6 @@ struct DashboardContent: View {
                     
                     // Zone APK Interactive ou Barre de Progression d'Installation
                     if vm.isInstallingAPK {
-                        // Carte de progression en direct
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Label("Installation en cours...", systemImage: "arrow.down.circle.fill")
@@ -185,72 +190,15 @@ struct DashboardContent: View {
                         )
                         .padding(.horizontal, 28)
                         .transition(.scale.combined(with: .opacity))
-                    } else {
-                        // Drag and Drop Zone APK
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(.ultraThinMaterial)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .strokeBorder(
-                                            vm.isDraggingOver ? Color.green : Color.white.opacity(0.2),
-                                            style: StrokeStyle(lineWidth: 1.5, dash: [6])
-                                        )
-                                )
-                            
-                            VStack(spacing: 8) {
-                                Image(systemName: "arrow.down.doc.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.green)
-                                Text("Glissez-déposez un fichier APK ici")
-                                    .font(.system(size: 13, weight: .semibold))
-                                Text("Affichage de l'avancement détaillé en temps réel")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.vertical, 18)
-                        }
-                        .padding(.horizontal, 28)
-                        .onDrop(of: ["public.file-url"], isTargeted: $vm.isDraggingOver) { providers in
-                            guard let provider = providers.first else { return false }
-                            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { urlData, _ in
-                                if let data = urlData as? Data,
-                                   let path = URL(dataRepresentation: data, relativeTo: nil)?.path {
-                                    DispatchQueue.main.async {
-                                        vm.installAPK(at: path)
-                                    }
-                                }
-                            }
-                            return true
-                        }
                     }
                     
-                    // Applications Grid Réelles
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Applications Android 16")
-                                .font(.system(size: 16, weight: .bold))
-                            Spacer()
-                            Text("\(vm.installedApps.count) disponible(s)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 28)
-                        
-                        ScrollView {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 16) {
-                                ForEach(vm.installedApps) { app in
-                                    Button(action: {
-                                        vm.launchApp(app)
-                                    }) {
-                                        RealAppCardView(app: app)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal, 28)
-                            .padding(.bottom, 24)
-                        }
+                    // Onglets de Contenu
+                    if vm.activeTab == "apps" {
+                        AppsTabView(vm: vm)
+                    } else if vm.activeTab == "device" {
+                        DeviceCustomizationView(vm: vm)
+                    } else if vm.activeTab == "perf" {
+                        PerformanceTabView(vm: vm)
                     }
                 }
             }
@@ -267,6 +215,334 @@ struct DashboardContent: View {
         if panel.runModal() == .OK, let url = panel.url {
             vm.installAPK(at: url.path)
         }
+    }
+}
+
+struct AppsTabView: View {
+    @ObservedObject var vm: AppViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Drag and Drop Zone APK
+            if !vm.isInstallingAPK {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(
+                                    vm.isDraggingOver ? Color.green : Color.white.opacity(0.2),
+                                    style: StrokeStyle(lineWidth: 1.5, dash: [6])
+                                )
+                        )
+                    
+                    VStack(spacing: 6) {
+                        Image(systemName: "arrow.down.doc.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.green)
+                        Text("Glissez-déposez un fichier APK ici")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Installez vos APKs sans passer par l'interface lourde")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 14)
+                }
+                .padding(.horizontal, 28)
+                .onDrop(of: ["public.file-url"], isTargeted: $vm.isDraggingOver) { providers in
+                    guard let provider = providers.first else { return false }
+                    provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { urlData, _ in
+                        if let data = urlData as? Data,
+                           let path = URL(dataRepresentation: data, relativeTo: nil)?.path {
+                            DispatchQueue.main.async {
+                                vm.installAPK(at: path)
+                            }
+                        }
+                    }
+                    return true
+                }
+            }
+            
+            HStack {
+                Text("Applications Android 16")
+                    .font(.system(size: 16, weight: .bold))
+                Spacer()
+                Text("Clic = Fenêtre native macOS dédiée")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 4)
+            
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 16) {
+                    ForEach(vm.installedApps) { app in
+                        Button(action: {
+                            vm.launchApp(app)
+                        }) {
+                            RealAppCardView(app: app)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 28)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+}
+
+struct DeviceCustomizationView: View {
+    @ObservedObject var vm: AppViewModel
+    
+    let presets = ["Pixel Phone", "Tablette (Grand Écran)", "Compact (Mini Fenêtre)", "Libre / Personnalisé"]
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Personnalisation de l'Appareil & Résolution")
+                        .font(.system(size: 18, weight: .bold))
+                    Text("Adaptez la taille et la densité d'affichage des fenêtres natives de vos applications.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Presets
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Profils d'appareil prédéfinis")
+                        .font(.system(size: 14, weight: .semibold))
+                    
+                    HStack(spacing: 12) {
+                        ForEach(presets, id: \.self) { preset in
+                            Button(action: {
+                                vm.applyPreset(preset)
+                            }) {
+                                VStack(spacing: 6) {
+                                    Image(systemName: preset.contains("Phone") ? "iphone" : (preset.contains("Tablette") ? "ipad" : "macwindow"))
+                                        .font(.system(size: 20))
+                                    Text(preset)
+                                        .font(.system(size: 11, weight: .medium))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(vm.selectedDevicePreset == preset ? Color.green.opacity(0.18) : Color.white.opacity(0.06))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(vm.selectedDevicePreset == preset ? Color.green : Color.clear, lineWidth: 1.5)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(18)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+                
+                // Sliders de redimensionnement dynamique
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Dimensions & Densité sur mesure")
+                        .font(.system(size: 14, weight: .semibold))
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Largeur de fenêtre :")
+                            Spacer()
+                            Text("\(vm.customWidth) px")
+                                .fontWeight(.bold)
+                                .font(.system(size: 13, design: .monospaced))
+                        }
+                        Slider(value: Binding(
+                            get: { Double(vm.customWidth) },
+                            set: { vm.customWidth = Int($0) }
+                        ), in: 320...1200, step: 20)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Hauteur de fenêtre :")
+                            Spacer()
+                            Text("\(vm.customHeight) px")
+                                .fontWeight(.bold)
+                                .font(.system(size: 13, design: .monospaced))
+                        }
+                        Slider(value: Binding(
+                            get: { Double(vm.customHeight) },
+                            set: { vm.customHeight = Int($0) }
+                        ), in: 480...1600, step: 20)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Densité d'affichage (DPI) :")
+                            Spacer()
+                            Text("\(vm.customDensity) dpi")
+                                .fontWeight(.bold)
+                                .font(.system(size: 13, design: .monospaced))
+                        }
+                        Slider(value: Binding(
+                            get: { Double(vm.customDensity) },
+                            set: { vm.customDensity = Int($0) }
+                        ), in: 160...480, step: 20)
+                    }
+                    
+                    Button(action: {
+                        vm.applyPreset("Libre / Personnalisé")
+                        BridgeManager.shared.setDisplayResolution(width: vm.customWidth, height: vm.customHeight, density: vm.customDensity)
+                        vm.alertMessage = "Dimensions appliquées : \(vm.customWidth)x\(vm.customHeight) @ \(vm.customDensity) DPI !"
+                    }) {
+                        Label("Appliquer à l'affichage actif", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.green.opacity(0.85))
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(18)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 24)
+        }
+    }
+}
+
+struct PerformanceTabView: View {
+    @ObservedObject var vm: AppViewModel
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Performances & Gestion Thermique Apple Silicon")
+                        .font(.system(size: 18, weight: .bold))
+                    Text("Surveillance en direct de l'impact matériel et optimisation thermique pour éviter la chauffe.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Carte Mode Éco / Zéro Chauffe
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(vm.ecoModeEnabled ? Color.blue.opacity(0.2) : Color.orange.opacity(0.2))
+                            .frame(width: 50, height: 50)
+                        Image(systemName: vm.ecoModeEnabled ? "snowflake" : "flame.fill")
+                            .font(.system(size: 26))
+                            .foregroundColor(vm.ecoModeEnabled ? .blue : .orange)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(vm.ecoModeEnabled ? "Mode Éco Silencieux Activé" : "Mode Standard")
+                            .font(.system(size: 15, weight: .bold))
+                        Text(vm.ecoModeEnabled ? "Animations Android désactivées, consommation GPU bridée pour un Mac parfaitement froid." : "Fréquence et animations maximales.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        vm.toggleEcoMode()
+                    }) {
+                        Text(vm.ecoModeEnabled ? "Désactiver" : "Activer")
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(vm.ecoModeEnabled ? Color.blue : Color.gray.opacity(0.3))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(18)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(vm.ecoModeEnabled ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
+                )
+                
+                // Métriques en Direct
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    MetricTileView(
+                        icon: "cpu",
+                        title: "Charge Processeur",
+                        value: vm.cpuUsageText,
+                        subtext: "Apple Silicon AArch64 Natif",
+                        tint: .green
+                    )
+                    
+                    MetricTileView(
+                        icon: "thermometer.snowflake",
+                        title: "Température Sous-système",
+                        value: vm.thermalTempText,
+                        subtext: "Gestion adaptative de puissance",
+                        tint: .blue
+                    )
+                    
+                    MetricTileView(
+                        icon: "memorychip",
+                        title: "Mémoire Vive Utilisée",
+                        value: vm.ramUsageText,
+                        subtext: "Partagée dynamiquement",
+                        tint: .purple
+                    )
+                    
+                    MetricTileView(
+                        icon: "gauge.with.needle",
+                        title: "Accélération Graphique",
+                        value: "Metal Vulkan Portability",
+                        subtext: "Rendu GPU direct sans émulation x86",
+                        tint: .orange
+                    )
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 24)
+        }
+    }
+}
+
+struct MetricTileView: View {
+    let icon: String
+    let title: String
+    let value: String
+    let subtext: String
+    let tint: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(tint)
+                    .font(.system(size: 18))
+                Spacer()
+            }
+            
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+            
+            Text(value)
+                .font(.system(size: 15, weight: .bold))
+                .lineLimit(1)
+            
+            Text(subtext)
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.03), radius: 6, y: 3)
     }
 }
 
@@ -317,9 +593,15 @@ struct RealAppCardView: View {
                     .foregroundColor(.white)
             }
             
-            Text(app.name)
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
+            VStack(spacing: 2) {
+                Text(app.name)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                
+                Text(app.isHomeLauncher ? "Bureau Pixel" : "Fenêtre macOS")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
