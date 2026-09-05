@@ -71,6 +71,7 @@ class AppViewModel: ObservableObject {
         
         loadRealApps()
         startHeartbeat()
+        checkInstallationStatus()
         BridgeManager.shared.applyThermalOptimization(enableEco: true)
     }
     
@@ -292,11 +293,38 @@ class AppViewModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 500_000_000)
             self.installSubsystemProgress = 1.0
             self.installSubsystemStatus = "Sous-système Android 16 prêt !"
-            self.appendLog("✅ Installation et configuration terminées ! Vous pouvez cliquer sur Démarrer.")
-            self.alertMessage = "✅ Android 16 Bare Metal est prêt à être démarré !"
-            
             try? await Task.sleep(nanoseconds: 800_000_000)
             self.isInstallingSubsystem = false
+            self.checkInstallationStatus()
         }
+    }
+    
+    func checkInstallationStatus() {
+        let config = MSAConfig.load()
+        let fm = FileManager.default
+        let hasKernel = fm.fileExists(atPath: config.kernelPath)
+        let hasSystem = fm.fileExists(atPath: config.systemImagePath)
+        let hasUserData = fm.fileExists(atPath: config.diskImagePath)
+        
+        self.isConfigured = hasKernel && hasSystem && hasUserData
+    }
+    
+    func reinstallSubsystem() {
+        appendLog("🔄 Réinitialisation complète du sous-système Android 16 demandée...")
+        deleteSubsystem()
+        installAndroidSubsystem()
+    }
+    
+    func deleteSubsystem() {
+        if isVMRunning {
+            toggleVM()
+        }
+        let config = MSAConfig.load()
+        let fm = FileManager.default
+        try? fm.removeItem(atPath: config.diskImagePath)
+        self.isConfigured = false
+        self.appendLog("🗑️ Partition de données userdata.img supprimée. Sous-système réinitialisé.")
+        self.alertMessage = "🗑️ Données Android 16 supprimées. Cliquez sur Installer pour repartir à zéro."
+        self.checkInstallationStatus()
     }
 }

@@ -98,32 +98,34 @@ struct DashboardContent: View {
                 
                 Spacer()
                 
-                // Bouton Installer Android 16
-                Button(action: {
-                    vm.installAndroidSubsystem()
-                }) {
-                    HStack {
-                        if vm.isInstallingSubsystem {
-                            ProgressView()
-                                .controlSize(.small)
-                                .colorInvert()
-                        } else {
-                            Image(systemName: "arrow.down.circle.fill")
+                // Bouton Installer Android 16 (affiché UNIQUEMENT si non encore installé)
+                if !vm.isConfigured {
+                    Button(action: {
+                        vm.installAndroidSubsystem()
+                    }) {
+                        HStack {
+                            if vm.isInstallingSubsystem {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .colorInvert()
+                            } else {
+                                Image(systemName: "arrow.down.circle.fill")
+                            }
+                            Text(vm.isInstallingSubsystem ? "Configuration..." : "Installer Android 16")
+                                .fontWeight(.medium)
+                                .font(.system(size: 12))
                         }
-                        Text(vm.isInstallingSubsystem ? "Configuration..." : "Installer Android 16")
-                            .fontWeight(.medium)
-                            .font(.system(size: 12))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(0.85))
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.blue.opacity(0.85))
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
+                    .buttonStyle(.plain)
+                    .disabled(vm.isInstallingSubsystem)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
                 }
-                .buttonStyle(.plain)
-                .disabled(vm.isInstallingSubsystem)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 6)
                 
                 // Bouton Start / Stop Bare Metal
                 Button(action: {
@@ -435,6 +437,57 @@ struct DeviceCustomizationView: View {
                             .cornerRadius(10)
                     }
                     .buttonStyle(.plain)
+                }
+                .padding(18)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+                
+                // Gestion & Maintenance du Sous-Système (Réinstaller / Supprimer)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Image(systemName: "wrench.and.screwdriver.fill")
+                            .foregroundColor(.orange)
+                        Text("Gestion & Maintenance du Sous-Système")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    
+                    Text("Vous pouvez réinitialiser complètement l'environnement Android 16 ou supprimer les partitions de données pour repartir de zéro.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            vm.reinstallSubsystem()
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                            }
+                            Text("Tout Réinstaller")
+                                .font(.system(size: 12, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.blue.opacity(0.85))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button(action: {
+                            vm.deleteSubsystem()
+                        }) {
+                            HStack {
+                                Image(systemName: "trash.fill")
+                            }
+                            Text("Supprimer le Sous-Système")
+                                .font(.system(size: 12, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.red.opacity(0.85))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(18)
                 .background(.ultraThinMaterial)

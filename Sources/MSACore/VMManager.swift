@@ -66,11 +66,12 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         bootLoader.commandLine = "console=hvc0 console=tty0 earlycon=uart8250,mmio32,0x09000000 root=/dev/vda rw androidboot.hardware=ranchu androidboot.selinux=permissive androidboot.freeform_window_management=1 init=/init"
         vzConfig.bootLoader = bootLoader
         
-        // 3. Serial Console
+        // 3. Serial Console (Captures du noyau Linux vers Pipe)
         let serial = VZVirtioConsoleDeviceSerialPortConfiguration()
+        let serialPipe = Pipe()
         let serialPortAttachment = VZFileHandleSerialPortAttachment(
             fileHandleForReading: FileHandle.nullDevice,
-            fileHandleForWriting: FileHandle.standardError
+            fileHandleForWriting: serialPipe.fileHandleForWriting
         )
         serial.attachment = serialPortAttachment
         vzConfig.serialPorts = [serial]
