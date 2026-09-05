@@ -80,7 +80,7 @@ public class BridgeManager {
         }
     }
     
-    public func launchAppWindow(packageName: String, title: String, isTablet: Bool = true) {
+    public func launchAppWindow(packageName: String, title: String, isTablet: Bool = true, codec: String = "h264", bitrate: String = "24M", maxFps: Int = 60) {
         // Démarre l'app dans un affichage virtuel indépendant dédié avec format Retina
         // --new-display + --flex-display redimensionne dynamiquement l'écran Android
         // pour correspondre EXACTEMENT aux proportions de la fenêtre sans bandes noires (zéro bordure)
@@ -94,11 +94,12 @@ public class BridgeManager {
             "-s", "emulator-5554",
             "--window-title", title,
             "--start-app", packageName,
+            "--render-driver=metal",           // Rendu 100% natif Apple Metal direct
+            "--video-codec=\(codec)",          // Codec choisi (h264, h265, av1, vp8, vp9)
+            "-b", bitrate,                     // Bitrate ajustable (ex: 8M, 16M, 24M, 32M, 48M)
+            "--max-fps", "\(maxFps)",          // FPS configurable (30, 60, 90, 120 ProMotion, 144)
             "--new-display=\(displaySize)",
-            "--flex-display",
-            "--video-codec=h265",
-            "-b", "32M",
-            "--max-fps", "60",
+            "--flex-display",                 // Plein écran auto-adaptatif sans bande noire
             "--no-audio"
         ]
         

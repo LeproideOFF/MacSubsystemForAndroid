@@ -32,6 +32,11 @@ class AppViewModel: ObservableObject {
     @Published var customHeight: Int = 840
     @Published var customDensity: Int = 320
     
+    // Paramètres Vidéo & Taux de Rafraîchissement (FPS & Codecs)
+    @Published var selectedMaxFps: Int = 60         // 30, 60, 90, 120 (ProMotion), 144
+    @Published var selectedVideoCodec: String = "h264" // "h264", "h265", "av1", "vp8", "vp9"
+    @Published var selectedBitrate: String = "24M"     // "8M", "16M", "24M", "32M", "48M"
+    
     // Performances & Thermique
     @Published var ecoModeEnabled: Bool = true
     @Published var cpuUsageText: String = "Actif (Apple Silicon M-Series)"
@@ -134,8 +139,15 @@ class AppViewModel: ObservableObject {
             self.alertMessage = "🏠 Affichage du Bureau d'Accueil Tablette Android 16..."
         } else {
             // Fenêtre native isolée pour l'application spécifique adaptée au Mac (format tablette haute qualité)
-            BridgeManager.shared.launchAppWindow(packageName: app.packageName, title: app.name, isTablet: (selectedDevicePreset.contains("Tablette") || selectedDevicePreset == "Pixel Phone"))
-            self.alertMessage = "🪟 Fenêtre native ouverte pour \(app.name) (Auto-adaptation dynamique active) !"
+            BridgeManager.shared.launchAppWindow(
+                packageName: app.packageName,
+                title: app.name,
+                isTablet: (selectedDevicePreset.contains("Tablette") || selectedDevicePreset == "Pixel Phone"),
+                codec: selectedVideoCodec,
+                bitrate: selectedBitrate,
+                maxFps: selectedMaxFps
+            )
+            self.alertMessage = "🪟 Fenêtre native ouverte pour \(app.name) (\(selectedMaxFps) FPS • \(selectedVideoCodec.uppercased()) • Metal) !"
         }
     }
     

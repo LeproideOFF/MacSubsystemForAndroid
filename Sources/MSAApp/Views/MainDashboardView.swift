@@ -469,6 +469,65 @@ struct PerformanceTabView: View {
                         .stroke(vm.ecoModeEnabled ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
                 )
                 
+                // Sélecteurs de Fluidité (FPS & Codecs Matériels)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Image(systemName: "speedometer")
+                            .foregroundColor(.blue)
+                        Text("Moteur Graphique & Fluidité d'Affichage")
+                            .font(.system(size: 15, weight: .bold))
+                    }
+                    
+                    // Sélecteur de Fréquence FPS
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Taux de rafraîchissement (FPS Max) :")
+                            .font(.system(size: 13, weight: .medium))
+                        
+                        HStack(spacing: 8) {
+                            ForEach([30, 60, 90, 120, 144], id: \.self) { fps in
+                                Button(action: {
+                                    vm.selectedMaxFps = fps
+                                }) {
+                                    Text("\(fps) FPS\(fps == 120 ? " ⚡" : "")")
+                                        .font(.system(size: 12, weight: vm.selectedMaxFps == fps ? .bold : .regular))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 8)
+                                        .background(vm.selectedMaxFps == fps ? Color.blue : Color.white.opacity(0.08))
+                                        .foregroundColor(vm.selectedMaxFps == fps ? .white : .primary)
+                                        .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    
+                    // Sélecteur de Codec Vidéo
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Codec Vidéo d'Encodage / Décodage :")
+                            .font(.system(size: 13, weight: .medium))
+                        
+                        HStack(spacing: 8) {
+                            ForEach(["h264", "h265", "av1", "vp9"], id: \.self) { codec in
+                                Button(action: {
+                                    vm.selectedVideoCodec = codec
+                                }) {
+                                    Text(codec.uppercased() + (codec == "h264" ? " (Matériel)" : ""))
+                                        .font(.system(size: 11, weight: vm.selectedVideoCodec == codec ? .bold : .regular))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 8)
+                                        .background(vm.selectedVideoCodec == codec ? Color.purple : Color.white.opacity(0.08))
+                                        .foregroundColor(vm.selectedVideoCodec == codec ? .white : .primary)
+                                        .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .padding(18)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+                
                 // Métriques en Direct
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                     MetricTileView(
