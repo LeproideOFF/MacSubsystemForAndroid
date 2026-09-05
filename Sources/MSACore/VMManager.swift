@@ -60,7 +60,7 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         
         // 2. Linux Bootloader
         let bootLoader = VZLinuxBootLoader(kernelURL: URL(fileURLWithPath: config.kernelPath))
-        bootLoader.commandLine = "console=hvc0 quiet loglevel=3 androidboot.hardware=virtio"
+        bootLoader.commandLine = "console=hvc0 root=/dev/vda rw androidboot.hardware=virtio androidboot.selinux=permissive init=/init quiet loglevel=3"
         vzConfig.bootLoader = bootLoader
         
         // 3. Serial Console
@@ -73,15 +73,38 @@ public class VMManager: NSObject, VZVirtualMachineDelegate {
         serial.attachment = serialPortAttachment
         vzConfig.serialPorts = [serial]
         
-        // 4. Entropy
+        // 4. Block Devices (Disque racine Android + Userdata 32 Go)
+        var storageDevices: [VZStorageDeviceConfiguration] = []
+        let fm = FileManager.default
+        
+        if fm.fileExists(atPath: config.systemImagePath) {
+            let systemAttachment = try VZDiskImageStorageDeviceAttachment(
+                url: URL(fileURLWithPath: config.systemImagePath),
+                readOnly: false
+            )
+            let systemBlock = VZVirtioBlockDeviceConfiguration(attachment: systemAttachment)
+            storageDevices.append(systemBlock)
+        }
+        
+        if fm.fileExists(atPath: config.diskImagePath) {
+            let dataAttachment = try VZDiskImageStorageDeviceAttachment(
+                url: URL(fileURLWithPath: config.diskImagePath),
+                readOnly: false
+            )
+            let dataBlock = VZVirtioBlockDeviceConfiguration(attachment: dataAttachment)
+            storageDevices.append(dataBlock)
+        }
+        vzConfig.storageDevices = storageDevices
+        
+        // 5. Entropy
         vzConfig.entropyDevices = [VZVirtioEntropyDeviceConfiguration()]
         
-        // 5. Network (Virtio NAT)
+        // 6. Network (Virtio NAT)
         let networkDevice = VZVirtioNetworkDeviceConfiguration()
         networkDevice.attachment = VZNATNetworkDeviceAttachment()
         vzConfig.networkDevices = [networkDevice]
         
-        // 6. Sockets (Virtio Vsock)
+        // 7. Sockets (Virtio Vsock)
         let socketDevice = VZVirtioSocketDeviceConfiguration()
         vzConfig.socketDevices = [socketDevice]
         
